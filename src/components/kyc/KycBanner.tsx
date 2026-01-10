@@ -1,0 +1,40 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+export const KycBanner: React.FC = () => {
+  const { isKycApproved, kycStatus } = useAuth();
+
+  if (isKycApproved) return null;
+
+  const getMessage = () => {
+    switch (kycStatus) {
+      case 'pending':
+        return 'Your identity verification is under review. Wallet features will be unlocked once approved.';
+      case 'rejected':
+        return 'Your identity verification was not approved. Please contact support.';
+      default:
+        return 'Complete KYC to unlock wallet features.';
+    }
+  };
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+      <div className="flex items-center gap-3">
+        <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+        <p className="text-amber-800 text-sm flex-1">
+          {getMessage()}
+        </p>
+        {kycStatus === 'not_started' && (
+          <Link
+            to="/kyc"
+            className="text-sm font-medium text-amber-700 hover:text-amber-900 underline"
+          >
+            Start verification
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+};
