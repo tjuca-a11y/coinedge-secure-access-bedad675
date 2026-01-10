@@ -3,7 +3,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronDown, Delete, X, ArrowLeft, UserPlus, Link2, ScanLine, Search } from "lucide-react";
+import { ChevronDown, Delete, X, ArrowLeft, Link2, ScanLine, Search } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-type RequestStep = "closed" | "description" | "recipient";
+type RequestStep = "closed" | "description" | "recipient" | "confirm" | "scanner";
 type PayStep = "closed" | "recipient" | "confirm" | "scanner";
 
 interface Contact {
@@ -46,12 +46,15 @@ const PayRequest: React.FC = () => {
   // Request flow state
   const [requestStep, setRequestStep] = useState<RequestStep>("closed");
   const [requestDescription, setRequestDescription] = useState("");
+  const [requestRecipient, setRequestRecipient] = useState("");
+  const [selectedRequestContact, setSelectedRequestContact] = useState<Contact | null>(null);
+  const [requestSearchQuery, setRequestSearchQuery] = useState("");
 
   // Pay flow state
   const [payStep, setPayStep] = useState<PayStep>("closed");
   const [payRecipient, setPayRecipient] = useState("");
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPayContact, setSelectedPayContact] = useState<Contact | null>(null);
+  const [paySearchQuery, setPaySearchQuery] = useState("");
 
   const handleNumberPress = (num: string) => {
     if (!isKycApproved) {
@@ -107,8 +110,29 @@ const PayRequest: React.FC = () => {
     setRequestStep("recipient");
   };
 
-  const handleAddRecipient = () => {
-    toast.success(`Request created for $${amount} for ${requestDescription || "payment"}`);
+  // Request handlers
+  const handleSelectRequestContact = (contact: Contact) => {
+    setSelectedRequestContact(contact);
+    setRequestStep("confirm");
+  };
+
+  const handleManualRequestRecipient = () => {
+    if (!requestRecipient.trim()) {
+      toast.error("Enter a recipient address or email");
+      return;
+    }
+    setSelectedRequestContact({ 
+      id: "manual", 
+      name: requestRecipient, 
+      initials: requestRecipient.slice(0, 2).toUpperCase(), 
+      color: "bg-muted" 
+    });
+    setRequestStep("confirm");
+  };
+
+  const handleConfirmRequest = () => {
+    const recipientName = selectedRequestContact?.name || requestRecipient;
+    toast.success(`Request sent to ${recipientName} for ${formatAmount(amount)}`);
     resetRequestFlow();
   };
 
@@ -117,31 +141,53 @@ const PayRequest: React.FC = () => {
     resetRequestFlow();
   };
 
+  const handleOpenRequestScanner = () => {
+    setRequestStep("scanner");
+  };
+
+  const handleRequestScanComplete = (address: string) => {
+    setRequestRecipient(address);
+    setSelectedRequestContact({ 
+      id: "scanned", 
+      name: address, 
+      initials: "QR", 
+      color: "bg-primary" 
+    });
+    setRequestStep("confirm");
+  };
+
   const resetRequestFlow = () => {
     setRequestStep("closed");
     setRequestDescription("");
+    setRequestRecipient("");
+    setSelectedRequestContact(null);
+    setRequestSearchQuery("");
     setAmount("0");
   };
 
-  const resetPayFlow = () => {
-    setPayStep("closed");
-    setPayRecipient("");
-    setSelectedContact(null);
-    setSearchQuery("");
-    setAmount("0");
+  const handleRequestBack = () => {
+    if (requestStep === "confirm" || requestStep === "scanner") {
+      setRequestStep("recipient");
+      setSelectedRequestContact(null);
+    } else if (requestStep === "recipient") {
+      setRequestStep("description");
+    } else {
+      setRequestStep("closed");
+    }
   };
 
-  const handleSelectContact = (contact: Contact) => {
-    setSelectedContact(contact);
+  // Pay handlers
+  const handleSelectPayContact = (contact: Contact) => {
+    setSelectedPayContact(contact);
     setPayStep("confirm");
   };
 
-  const handleManualRecipient = () => {
+  const handleManualPayRecipient = () => {
     if (!payRecipient.trim()) {
       toast.error("Enter a recipient address or email");
       return;
     }
-    setSelectedContact({ 
+    setSelectedPayContact({ 
       id: "manual", 
       name: payRecipient, 
       initials: payRecipient.slice(0, 2).toUpperCase(), 
@@ -151,18 +197,18 @@ const PayRequest: React.FC = () => {
   };
 
   const handleConfirmPay = () => {
-    const recipientName = selectedContact?.name || payRecipient;
+    const recipientName = selectedPayContact?.name || payRecipient;
     toast.success(`Sent ${formatAmount(amount)} to ${recipientName}`);
     resetPayFlow();
   };
 
-  const handleOpenScanner = () => {
+  const handleOpenPayScanner = () => {
     setPayStep("scanner");
   };
 
-  const handleScanComplete = (address: string) => {
+  const handlePayScanComplete = (address: string) => {
     setPayRecipient(address);
-    setSelectedContact({ 
+    setSelectedPayContact({ 
       id: "scanned", 
       name: address, 
       initials: "QR", 
@@ -171,18 +217,18 @@ const PayRequest: React.FC = () => {
     setPayStep("confirm");
   };
 
-  const handleBack = () => {
-    if (requestStep === "recipient") {
-      setRequestStep("description");
-    } else {
-      setRequestStep("closed");
-    }
+  const resetPayFlow = () => {
+    setPayStep("closed");
+    setPayRecipient("");
+    setSelectedPayContact(null);
+    setPaySearchQuery("");
+    setAmount("0");
   };
 
   const handlePayBack = () => {
     if (payStep === "confirm" || payStep === "scanner") {
       setPayStep("recipient");
-      setSelectedContact(null);
+      setSelectedPayContact(null);
     } else {
       setPayStep("closed");
     }
@@ -197,10 +243,16 @@ const PayRequest: React.FC = () => {
     return `$${num.toLocaleString()}`;
   };
 
-  const filteredContacts = recentContacts.filter(contact => 
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.address?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPayContacts = recentContacts.filter(contact => 
+    contact.name.toLowerCase().includes(paySearchQuery.toLowerCase()) ||
+    contact.email?.toLowerCase().includes(paySearchQuery.toLowerCase()) ||
+    contact.address?.toLowerCase().includes(paySearchQuery.toLowerCase())
+  );
+
+  const filteredRequestContacts = recentContacts.filter(contact => 
+    contact.name.toLowerCase().includes(requestSearchQuery.toLowerCase()) ||
+    contact.email?.toLowerCase().includes(requestSearchQuery.toLowerCase()) ||
+    contact.address?.toLowerCase().includes(requestSearchQuery.toLowerCase())
   );
 
   return (
@@ -314,13 +366,13 @@ const PayRequest: React.FC = () => {
         </DrawerContent>
       </Drawer>
 
-      {/* Request Recipient Drawer */}
+      {/* Request Recipient Selection Drawer */}
       <Drawer open={requestStep === "recipient"} onOpenChange={(open) => !open && setRequestStep("closed")}>
-        <DrawerContent className="bg-card border-t border-border">
-          <div className="p-6 space-y-6">
+        <DrawerContent className="bg-card border-t border-border max-h-[85vh]">
+          <div className="p-6 space-y-6 overflow-y-auto">
             <button 
-              onClick={handleBack}
-              className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors"
+              onClick={handleRequestBack}
+              className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors z-10"
             >
               <ArrowLeft className="h-5 w-5 text-foreground" />
             </button>
@@ -334,23 +386,184 @@ const PayRequest: React.FC = () => {
               </p>
             </div>
 
-            <div className="space-y-3 pt-6">
+            {/* Search / Enter Address */}
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  value={requestRecipient}
+                  onChange={(e) => {
+                    setRequestRecipient(e.target.value);
+                    setRequestSearchQuery(e.target.value);
+                  }}
+                  placeholder="Email, phone, or wallet address"
+                  className="pl-10 h-12 rounded-xl bg-muted/50 border-0"
+                />
+              </div>
+
+              {requestRecipient && (
+                <Button
+                  onClick={handleManualRequestRecipient}
+                  variant="secondary"
+                  className="w-full h-12 rounded-full"
+                >
+                  Request from "{requestRecipient}"
+                </Button>
+              )}
+
+              {/* Scan QR Button */}
               <Button
-                onClick={handleAddRecipient}
-                className="w-full h-14 text-base font-medium rounded-full bg-muted hover:bg-muted/80 text-foreground"
+                onClick={handleOpenRequestScanner}
+                variant="outline"
+                className="w-full h-12 rounded-full border-2"
               >
-                <UserPlus className="h-5 w-5 mr-2" />
-                Add recipient
+                <ScanLine className="h-5 w-5 mr-2" />
+                Scan QR Code
               </Button>
+
+              {/* Share Link Button */}
               <Button
                 onClick={handleShareLink}
                 variant="outline"
-                className="w-full h-14 text-base font-medium rounded-full border-2 bg-background hover:bg-muted/50"
+                className="w-full h-12 rounded-full border-2"
               >
                 <Link2 className="h-5 w-5 mr-2" />
                 Share link
               </Button>
             </div>
+
+            {/* Recent Contacts */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                Recent
+              </h3>
+              <div className="space-y-2">
+                {filteredRequestContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    onClick={() => handleSelectRequestContact(contact)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <Avatar className={`h-12 w-12 ${contact.color}`}>
+                      <AvatarFallback className="text-white font-medium">
+                        {contact.initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{contact.name}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {contact.email || contact.address}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Request Confirm Drawer */}
+      <Drawer open={requestStep === "confirm"} onOpenChange={(open) => !open && setRequestStep("closed")}>
+        <DrawerContent className="bg-card border-t border-border">
+          <div className="p-6 space-y-6">
+            <button 
+              onClick={handleRequestBack}
+              className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-foreground" />
+            </button>
+
+            <div className="pt-4 text-center space-y-4">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+                Request {formatAmount(amount)}
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                for {requestDescription || "payment"}
+              </p>
+              
+              {selectedRequestContact && (
+                <div className="flex flex-col items-center gap-3 pt-2">
+                  <Avatar className={`h-16 w-16 ${selectedRequestContact.color}`}>
+                    <AvatarFallback className="text-white text-xl font-medium">
+                      {selectedRequestContact.initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium text-foreground text-lg">{selectedRequestContact.name}</p>
+                    {selectedRequestContact.email && (
+                      <p className="text-sm text-muted-foreground">{selectedRequestContact.email}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 pt-4">
+              <Button
+                onClick={handleConfirmRequest}
+                className="w-full h-14 text-base font-medium rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                Send Request
+              </Button>
+              <Button
+                onClick={handleRequestBack}
+                variant="ghost"
+                className="w-full h-12 text-base font-medium rounded-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Request QR Scanner Drawer */}
+      <Drawer open={requestStep === "scanner"} onOpenChange={(open) => !open && setRequestStep("closed")}>
+        <DrawerContent className="bg-card border-t border-border">
+          <div className="p-6 space-y-6">
+            <button 
+              onClick={handleRequestBack}
+              className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors z-10"
+            >
+              <ArrowLeft className="h-5 w-5 text-foreground" />
+            </button>
+
+            <div className="pt-4 text-center">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+                Scan QR Code
+              </h2>
+              <p className="text-muted-foreground mt-1">Point your camera at a wallet QR code</p>
+            </div>
+
+            {/* Scanner Viewfinder */}
+            <div className="relative aspect-square max-w-xs mx-auto bg-muted/20 rounded-2xl overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-48 h-48 border-2 border-primary rounded-2xl relative">
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                  <div className="absolute left-2 right-2 h-0.5 bg-primary animate-pulse top-1/2" />
+                </div>
+              </div>
+              
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ScanLine className="h-24 w-24 text-muted-foreground/30" />
+              </div>
+            </div>
+
+            <Button
+              onClick={() => handleRequestScanComplete("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")}
+              variant="secondary"
+              className="w-full h-12 rounded-full"
+            >
+              Simulate Scan (Demo)
+            </Button>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Camera access required for scanning
+            </p>
           </div>
         </DrawerContent>
       </Drawer>
@@ -381,7 +594,7 @@ const PayRequest: React.FC = () => {
                   value={payRecipient}
                   onChange={(e) => {
                     setPayRecipient(e.target.value);
-                    setSearchQuery(e.target.value);
+                    setPaySearchQuery(e.target.value);
                   }}
                   placeholder="Email, phone, or wallet address"
                   className="pl-10 h-12 rounded-xl bg-muted/50 border-0"
@@ -390,7 +603,7 @@ const PayRequest: React.FC = () => {
 
               {payRecipient && (
                 <Button
-                  onClick={handleManualRecipient}
+                  onClick={handleManualPayRecipient}
                   variant="secondary"
                   className="w-full h-12 rounded-full"
                 >
@@ -400,7 +613,7 @@ const PayRequest: React.FC = () => {
 
               {/* Scan QR Button */}
               <Button
-                onClick={handleOpenScanner}
+                onClick={handleOpenPayScanner}
                 variant="outline"
                 className="w-full h-12 rounded-full border-2"
               >
@@ -415,10 +628,10 @@ const PayRequest: React.FC = () => {
                 Recent
               </h3>
               <div className="space-y-2">
-                {filteredContacts.map((contact) => (
+                {filteredPayContacts.map((contact) => (
                   <button
                     key={contact.id}
-                    onClick={() => handleSelectContact(contact)}
+                    onClick={() => handleSelectPayContact(contact)}
                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-left"
                   >
                     <Avatar className={`h-12 w-12 ${contact.color}`}>
@@ -456,17 +669,17 @@ const PayRequest: React.FC = () => {
                 Pay {formatAmount(amount)}
               </h2>
               
-              {selectedContact && (
+              {selectedPayContact && (
                 <div className="flex flex-col items-center gap-3">
-                  <Avatar className={`h-16 w-16 ${selectedContact.color}`}>
+                  <Avatar className={`h-16 w-16 ${selectedPayContact.color}`}>
                     <AvatarFallback className="text-white text-xl font-medium">
-                      {selectedContact.initials}
+                      {selectedPayContact.initials}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium text-foreground text-lg">{selectedContact.name}</p>
-                    {selectedContact.email && (
-                      <p className="text-sm text-muted-foreground">{selectedContact.email}</p>
+                    <p className="font-medium text-foreground text-lg">{selectedPayContact.name}</p>
+                    {selectedPayContact.email && (
+                      <p className="text-sm text-muted-foreground">{selectedPayContact.email}</p>
                     )}
                   </div>
                 </div>
@@ -492,7 +705,7 @@ const PayRequest: React.FC = () => {
         </DrawerContent>
       </Drawer>
 
-      {/* QR Scanner Drawer */}
+      {/* Pay QR Scanner Drawer */}
       <Drawer open={payStep === "scanner"} onOpenChange={(open) => !open && setPayStep("closed")}>
         <DrawerContent className="bg-card border-t border-border">
           <div className="p-6 space-y-6">
@@ -514,13 +727,10 @@ const PayRequest: React.FC = () => {
             <div className="relative aspect-square max-w-xs mx-auto bg-muted/20 rounded-2xl overflow-hidden">
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-48 h-48 border-2 border-primary rounded-2xl relative">
-                  {/* Corner accents */}
                   <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg" />
                   <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg" />
                   <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg" />
                   <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg" />
-                  
-                  {/* Scanning line animation */}
                   <div className="absolute left-2 right-2 h-0.5 bg-primary animate-pulse top-1/2" />
                 </div>
               </div>
@@ -530,9 +740,8 @@ const PayRequest: React.FC = () => {
               </div>
             </div>
 
-            {/* Demo: Simulate scan */}
             <Button
-              onClick={() => handleScanComplete("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")}
+              onClick={() => handlePayScanComplete("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")}
               variant="secondary"
               className="w-full h-12 rounded-full"
             >
