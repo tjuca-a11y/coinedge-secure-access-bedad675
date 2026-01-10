@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/sidebar";
 
 const navItems = [
-  { title: "Activity", url: "/activity", icon: Activity },
   { title: "Wallet", url: "/wallet", icon: Wallet },
   { title: "Pay & Request", url: "/pay", icon: ArrowUpDown },
+  { title: "Activity", url: "/activity", icon: Activity },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

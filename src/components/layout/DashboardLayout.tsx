@@ -1,6 +1,7 @@
 import React from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { BottomNav } from "./BottomNav";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -37,11 +38,12 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-3 md:p-6 overflow-auto">
+          <main className="flex-1 p-3 md:p-6 pb-20 md:pb-6 overflow-auto">
             <KycBanner />
             {children}
           </main>
         </div>
+        <BottomNav />
       </div>
     </SidebarProvider>
   );
