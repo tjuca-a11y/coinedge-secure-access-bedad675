@@ -8,7 +8,11 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Kyc from "./pages/Kyc";
-import Dashboard from "./pages/Dashboard";
+import Activity from "./pages/Activity";
+import Wallet from "./pages/Wallet";
+import PayRequest from "./pages/PayRequest";
+import Settings from "./pages/Settings";
+import Redeem from "./pages/Redeem";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,11 +32,50 @@ const App = () => (
               path="/"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Navigate to="/activity" replace />
                 </ProtectedRoute>
               }
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route
+              path="/activity"
+              element={
+                <ProtectedRoute>
+                  <Activity />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wallet"
+              element={
+                <ProtectedRoute>
+                  <Wallet />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pay"
+              element={
+                <ProtectedRoute>
+                  <PayRequest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/redeem"
+              element={
+                <ProtectedRoute>
+                  <Redeem />
+                </ProtectedRoute>
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
