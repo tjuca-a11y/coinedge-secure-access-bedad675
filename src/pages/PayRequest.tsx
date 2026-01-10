@@ -41,7 +41,7 @@ const recentContacts: Contact[] = [
 const PayRequest: React.FC = () => {
   const { isKycApproved } = useAuth();
   const [amount, setAmount] = useState("0");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("USDC");
   
   // Request flow state
   const [requestStep, setRequestStep] = useState<RequestStep>("closed");
@@ -271,7 +271,6 @@ const PayRequest: React.FC = () => {
               <ChevronDown className="h-3 w-3 opacity-50" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="USD">USD</SelectItem>
               <SelectItem value="BTC">BTC</SelectItem>
               <SelectItem value="USDC">USDC</SelectItem>
             </SelectContent>
