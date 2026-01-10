@@ -48,7 +48,7 @@ const Settings: React.FC = () => {
 
   return (
     <DashboardLayout title="Settings" subtitle="Manage your account and preferences">
-      <div className="space-y-6 max-w-2xl">
+      <div className="space-y-4 md:space-y-6 max-w-2xl">
         {/* Profile Section */}
         <Card>
           <CardHeader>
@@ -63,7 +63,7 @@ const Settings: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <div className="space-y-2">
                 <Label>Email</Label>
                 <Input value={user?.email || ""} disabled />

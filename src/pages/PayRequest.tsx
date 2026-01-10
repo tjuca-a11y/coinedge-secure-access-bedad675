@@ -48,41 +48,41 @@ const PayRequest: React.FC = () => {
   return (
     <DashboardLayout title="Pay & Request" subtitle="Send and request crypto payments">
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
         <Card className={`cursor-pointer transition-colors ${isKycApproved ? "bg-primary text-primary-foreground hover:bg-primary/90" : "opacity-50"}`}>
-          <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-            <Send className="h-6 w-6" />
-            <span className="font-medium text-sm">Send Money</span>
+          <CardContent className="p-3 md:p-4 flex flex-col items-center justify-center gap-1 md:gap-2">
+            <Send className="h-5 w-5 md:h-6 md:w-6" />
+            <span className="font-medium text-xs md:text-sm">Send Money</span>
           </CardContent>
         </Card>
         <Card className={`cursor-pointer transition-colors ${isKycApproved ? "hover:bg-muted/50" : "opacity-50"}`}>
-          <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-            <Download className="h-6 w-6" />
-            <span className="font-medium text-sm">Request Money</span>
+          <CardContent className="p-3 md:p-4 flex flex-col items-center justify-center gap-1 md:gap-2">
+            <Download className="h-5 w-5 md:h-6 md:w-6" />
+            <span className="font-medium text-xs md:text-sm">Request Money</span>
           </CardContent>
         </Card>
         <Card className={`cursor-pointer transition-colors ${isKycApproved ? "hover:bg-muted/50" : "opacity-50"}`}>
-          <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-            <Scan className="h-6 w-6" />
-            <span className="font-medium text-sm">Scan QR</span>
+          <CardContent className="p-3 md:p-4 flex flex-col items-center justify-center gap-1 md:gap-2">
+            <Scan className="h-5 w-5 md:h-6 md:w-6" />
+            <span className="font-medium text-xs md:text-sm">Scan QR</span>
           </CardContent>
         </Card>
         <Card className={`cursor-pointer transition-colors ${isKycApproved ? "hover:bg-muted/50" : "opacity-50"}`}>
-          <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-            <QrCode className="h-6 w-6" />
-            <span className="font-medium text-sm">My QR Code</span>
+          <CardContent className="p-3 md:p-4 flex flex-col items-center justify-center gap-1 md:gap-2">
+            <QrCode className="h-5 w-5 md:h-6 md:w-6" />
+            <span className="font-medium text-xs md:text-sm">My QR Code</span>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="send" className="space-y-6">
+      <Tabs defaultValue="send" className="space-y-4 md:space-y-6">
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="send" className="gap-2">
-            <Send className="h-4 w-4" />
+          <TabsTrigger value="send" className="gap-1.5 md:gap-2 text-sm">
+            <Send className="h-3.5 w-3.5 md:h-4 md:w-4" />
             Send
           </TabsTrigger>
-          <TabsTrigger value="request" className="gap-2">
-            <Download className="h-4 w-4" />
+          <TabsTrigger value="request" className="gap-1.5 md:gap-2 text-sm">
+            <Download className="h-3.5 w-3.5 md:h-4 md:w-4" />
             Request
           </TabsTrigger>
         </TabsList>

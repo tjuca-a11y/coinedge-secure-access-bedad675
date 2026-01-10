@@ -33,18 +33,18 @@ const Wallet: React.FC = () => {
   return (
     <DashboardLayout title="Wallet" subtitle="Manage your Bitcoin and USDC balances">
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <Button disabled={!isKycApproved} className="gap-2">
+      <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
+        <Button disabled={!isKycApproved} className="gap-2 flex-1 sm:flex-none text-sm">
           <Send className="h-4 w-4" />
           Send
         </Button>
-        <Button variant="outline" disabled={!isKycApproved} className="gap-2">
+        <Button variant="outline" disabled={!isKycApproved} className="gap-2 flex-1 sm:flex-none text-sm">
           <Download className="h-4 w-4" />
           Receive
         </Button>
         <Button 
           disabled={!isKycApproved} 
-          className="gap-2 bg-accent hover:bg-accent/90"
+          className="gap-2 bg-accent hover:bg-accent/90 flex-1 sm:flex-none text-sm"
           onClick={() => navigate("/redeem")}
         >
           <Gift className="h-4 w-4" />
@@ -53,7 +53,7 @@ const Wallet: React.FC = () => {
       </div>
 
       {/* Balance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-3">
@@ -69,8 +69,8 @@ const Wallet: React.FC = () => {
           <CardContent>
             {isKycApproved ? (
               <>
-                <p className="text-3xl font-bold mb-1">0.00000000 BTC</p>
-                <p className="text-sm text-muted-foreground mb-4">≈ $0.00</p>
+                <p className="text-2xl md:text-3xl font-bold mb-1">0.00000000 BTC</p>
+                <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ $0.00</p>
                 {profile?.btc_address && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground mb-1">Wallet Address</p>
@@ -109,8 +109,8 @@ const Wallet: React.FC = () => {
           <CardContent>
             {isKycApproved ? (
               <>
-                <p className="text-3xl font-bold mb-1">0.00 USDC</p>
-                <p className="text-sm text-muted-foreground mb-4">≈ $0.00</p>
+                <p className="text-2xl md:text-3xl font-bold mb-1">0.00 USDC</p>
+                <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ $0.00</p>
                 {profile?.usdc_address && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground mb-1">Wallet Address</p>
@@ -136,23 +136,24 @@ const Wallet: React.FC = () => {
       </div>
 
       {/* Price Chart */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="mb-4 md:mb-6">
+        <CardHeader className="pb-2 md:pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <CardTitle>Bitcoin Price</CardTitle>
-              <p className="text-3xl font-bold mt-2">$93,327.91</p>
-              <p className="text-sm text-success flex items-center gap-1">
-                <ArrowUpRight className="h-4 w-4" />
+              <CardTitle className="text-base md:text-lg">Bitcoin Price</CardTitle>
+              <p className="text-2xl md:text-3xl font-bold mt-1 md:mt-2">$93,327.91</p>
+              <p className="text-xs md:text-sm text-success flex items-center gap-1">
+                <ArrowUpRight className="h-3 w-3 md:h-4 md:w-4" />
                 +2.05% today
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1 md:gap-2 overflow-x-auto pb-1">
               {["1D", "1W", "1M", "1Y", "All"].map((period) => (
                 <Button
                   key={period}
                   variant={period === "1W" ? "default" : "outline"}
                   size="sm"
+                  className="h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm shrink-0"
                 >
                   {period}
                 </Button>
@@ -160,8 +161,8 @@ const Wallet: React.FC = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-[200px]">
+        <CardContent className="pt-0 md:pt-2">
+          <div className="h-[150px] md:h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={priceData}>
                 <XAxis dataKey="date" axisLine={false} tickLine={false} />

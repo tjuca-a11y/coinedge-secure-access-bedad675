@@ -19,25 +19,25 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-14 md:h-16 border-b border-border bg-card flex items-center justify-between px-3 md:px-6 sticky top-0 z-10">
+            <div className="flex items-center gap-2 md:gap-4 min-w-0">
+              <SidebarTrigger className="shrink-0" />
               {title && (
-                <div>
-                  <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-                  {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+                <div className="min-w-0">
+                  <h1 className="text-base md:text-xl font-semibold text-foreground truncate">{title}</h1>
+                  {subtitle && <p className="text-xs md:text-sm text-muted-foreground truncate hidden sm:block">{subtitle}</p>}
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground hidden sm:block">{user?.email}</span>
-              <Button variant="ghost" size="icon" onClick={signOut}>
-                <LogOut className="h-5 w-5" />
+            <div className="flex items-center gap-2 md:gap-4 shrink-0">
+              <span className="text-xs md:text-sm text-muted-foreground hidden md:block truncate max-w-[150px]">{user?.email}</span>
+              <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 md:h-10 md:w-10">
+                <LogOut className="h-4 w-4 md:h-5 md:w-5" />
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-3 md:p-6 overflow-auto">
             <KycBanner />
             {children}
           </main>
