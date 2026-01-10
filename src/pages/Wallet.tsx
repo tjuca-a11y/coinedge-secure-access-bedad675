@@ -52,7 +52,16 @@ const Wallet: React.FC = () => {
           isRefreshing={isRefreshing} 
         />
 
-        {/* Bitcoin Price Chart - Now at top */}
+        {/* Total Balance Card */}
+        <Card className="mb-4 md:mb-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
+          <CardContent className="py-6">
+            <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
+            <p className="text-3xl md:text-4xl font-bold">$0.00</p>
+            <p className="text-sm text-muted-foreground mt-1">≈ 0.00 USDC</p>
+          </CardContent>
+        </Card>
+
+        {/* Bitcoin Price Chart */}
         <Card className="mb-4 md:mb-6">
           <CardHeader className="pb-2 md:pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
