@@ -183,7 +183,21 @@ const MerchantCashierPOS: React.FC = () => {
                 step="0.01"
               />
             </div>
-            <p className="mt-2 text-center text-sm text-muted-foreground">Enter card value</p>
+            {/* Quick Amount Presets */}
+            <div className="mt-4 grid grid-cols-4 gap-2">
+              {[25, 50, 100, 250].map((preset) => (
+                <Button
+                  key={preset}
+                  variant={amount === String(preset) ? 'default' : 'outline'}
+                  size="lg"
+                  className="h-12 text-lg font-semibold"
+                  onClick={() => setAmount(String(preset))}
+                >
+                  ${preset}
+                </Button>
+              ))}
+            </div>
+            <p className="mt-3 text-center text-sm text-muted-foreground">Select or enter card value</p>
           </CardContent>
         </Card>
 
