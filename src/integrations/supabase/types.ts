@@ -1244,7 +1244,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      hash_admin_pin: { Args: { pin: string }; Returns: string }
+      hash_admin_pin: { Args: { p_pin: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_merchant_admin: { Args: { _user_id: string }; Returns: boolean }
       is_merchant_cashier_or_admin: {
