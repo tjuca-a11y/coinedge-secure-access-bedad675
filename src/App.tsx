@@ -56,6 +56,7 @@ import MerchantOrderCards from "./pages/merchant/admin/MerchantOrderCards";
 import MerchantOrders from "./pages/merchant/admin/MerchantOrders";
 import MerchantCashiers from "./pages/merchant/admin/MerchantCashiers";
 import MerchantCashierPOS from "./pages/merchant/MerchantCashierPOS";
+import MerchantActivationHistory from "./pages/merchant/MerchantActivationHistory";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,7 @@ const App = () => (
                 <Route path="admin/orders" element={<MerchantProtectedRoute requireAdmin><MerchantOrders /></MerchantProtectedRoute>} />
                 <Route path="admin/cashiers" element={<MerchantProtectedRoute requireAdmin><MerchantCashiers /></MerchantProtectedRoute>} />
                 <Route path="cashier" element={<MerchantProtectedRoute><MerchantCashierPOS /></MerchantProtectedRoute>} />
+                <Route path="history" element={<MerchantProtectedRoute><MerchantActivationHistory /></MerchantProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/merchant/cashier" replace />} />
               </Routes>
             </MerchantAuthProvider>
