@@ -6,45 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Shield, Bell, Key, LogOut, CheckCircle, Clock, XCircle } from "lucide-react";
+import { User, Bell, Key, LogOut } from "lucide-react";
 import { toast } from "sonner";
+import IdentityVerificationCard from "@/components/settings/IdentityVerificationCard";
 
 const Settings: React.FC = () => {
-  const { user, profile, signOut, kycStatus } = useAuth();
-
-  const getKycBadge = () => {
-    switch (kycStatus) {
-      case "approved":
-        return (
-          <Badge className="bg-success/10 text-success hover:bg-success/20 gap-1">
-            <CheckCircle className="h-3 w-3" />
-            Verified
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge className="bg-warning/10 text-warning hover:bg-warning/20 gap-1">
-            <Clock className="h-3 w-3" />
-            Pending
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20 gap-1">
-            <XCircle className="h-3 w-3" />
-            Rejected
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary" className="gap-1">
-            Not Started
-          </Badge>
-        );
-    }
-  };
+  const { user, profile, signOut } = useAuth();
 
   return (
     <DashboardLayout title="Settings" subtitle="Manage your account and preferences">
@@ -82,45 +50,8 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* KYC Status */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-full">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Identity Verification</CardTitle>
-                  <CardDescription>KYC status and verification details</CardDescription>
-                </div>
-              </div>
-              {getKycBadge()}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {kycStatus === "approved" && profile?.kyc_approved_at && (
-              <p className="text-sm text-muted-foreground">
-                Verified on {new Date(profile.kyc_approved_at).toLocaleDateString()}
-              </p>
-            )}
-            {kycStatus === "pending" && (
-              <p className="text-sm text-muted-foreground">
-                Your documents are being reviewed. This usually takes 1-2 business days.
-              </p>
-            )}
-            {kycStatus === "not_started" && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Complete identity verification to unlock all wallet features.
-                </p>
-                <Button onClick={() => window.location.href = "/kyc"}>
-                  Start Verification
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Identity Verification */}
+        <IdentityVerificationCard />
 
         {/* Notifications */}
         <Card>
