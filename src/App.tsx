@@ -12,6 +12,7 @@ import Activity from "./pages/Activity";
 import Wallet from "./pages/Wallet";
 import PayRequest from "./pages/PayRequest";
 import Settings from "./pages/Settings";
+import IdentityVerification from "./pages/IdentityVerification";
 import Redeem from "./pages/Redeem";
 import NotFound from "./pages/NotFound";
 
@@ -65,6 +66,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/identity-verification"
+              element={
+                <ProtectedRoute>
+                  <IdentityVerification />
                 </ProtectedRoute>
               }
             />
