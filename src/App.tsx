@@ -55,6 +55,7 @@ import MerchantAddBalance from "./pages/merchant/admin/MerchantAddBalance";
 import MerchantOrderCards from "./pages/merchant/admin/MerchantOrderCards";
 import MerchantOrders from "./pages/merchant/admin/MerchantOrders";
 import MerchantCashiers from "./pages/merchant/admin/MerchantCashiers";
+import MerchantSettings from "./pages/merchant/admin/MerchantSettings";
 import MerchantCashierPOS from "./pages/merchant/MerchantCashierPOS";
 import MerchantActivationHistory from "./pages/merchant/MerchantActivationHistory";
 
@@ -117,6 +118,7 @@ const App = () => (
                 <Route path="admin/order-cards" element={<MerchantProtectedRoute requireAdmin><MerchantOrderCards /></MerchantProtectedRoute>} />
                 <Route path="admin/orders" element={<MerchantProtectedRoute requireAdmin><MerchantOrders /></MerchantProtectedRoute>} />
                 <Route path="admin/cashiers" element={<MerchantProtectedRoute requireAdmin><MerchantCashiers /></MerchantProtectedRoute>} />
+                <Route path="admin/settings" element={<MerchantProtectedRoute requireAdmin><MerchantSettings /></MerchantProtectedRoute>} />
                 <Route path="cashier" element={<MerchantProtectedRoute><MerchantCashierPOS /></MerchantProtectedRoute>} />
                 <Route path="history" element={<MerchantProtectedRoute><MerchantActivationHistory /></MerchantProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/merchant/cashier" replace />} />

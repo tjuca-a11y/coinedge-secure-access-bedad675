@@ -1256,8 +1256,16 @@ export type Database = {
         Args: { p_fulfillment_id: string }
         Returns: boolean
       }
+      update_admin_pin: {
+        Args: {
+          p_current_pin: string
+          p_merchant_id: string
+          p_new_pin: string
+        }
+        Returns: boolean
+      }
       verify_admin_pin: {
-        Args: { merchant_id: string; pin: string }
+        Args: { p_merchant_id: string; p_pin: string }
         Returns: boolean
       }
     }

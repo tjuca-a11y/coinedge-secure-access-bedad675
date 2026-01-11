@@ -41,6 +41,7 @@ import {
   Settings,
   Lock,
   Loader2,
+  LockOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -63,6 +64,7 @@ export const MerchantSidebar: React.FC = () => {
     { to: '/merchant/admin/order-cards', icon: Package, label: 'Order Cards' },
     { to: '/merchant/admin/orders', icon: CreditCard, label: 'Orders' },
     { to: '/merchant/admin/cashiers', icon: Users, label: 'Cashiers' },
+    { to: '/merchant/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
   const cashierLinks = [
@@ -83,6 +85,13 @@ export const MerchantSidebar: React.FC = () => {
     }
   };
 
+  const handleLockAdmin = () => {
+    setAdminUnlocked(false);
+    setAdminOpen(false);
+    navigate('/merchant/cashier');
+    toast({ title: 'Admin Panel Locked', description: 'Access revoked' });
+  };
+
   const handlePinSubmit = async () => {
     if (!merchant?.id || !pin) return;
     
@@ -91,8 +100,8 @@ export const MerchantSidebar: React.FC = () => {
     
     try {
       const { data, error } = await supabase.rpc('verify_admin_pin', {
-        merchant_id: merchant.id,
-        pin: pin
+        p_merchant_id: merchant.id,
+        p_pin: pin
       });
       
       if (error) {
@@ -179,26 +188,39 @@ export const MerchantSidebar: React.FC = () => {
           {isMerchantAdmin && (
             <Collapsible open={adminOpen && adminUnlocked} onOpenChange={handleAdminClick}>
               <SidebarGroup>
-                <CollapsibleTrigger className="w-full" onClick={handleAdminClick}>
-                  <SidebarGroupLabel className="flex w-full cursor-pointer items-center justify-between pr-2 hover:bg-accent/50 rounded-md">
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between">
+                  <CollapsibleTrigger className="flex-1" onClick={handleAdminClick}>
+                    <SidebarGroupLabel className="flex w-full cursor-pointer items-center justify-between pr-2 hover:bg-accent/50 rounded-md">
+                      <div className="flex items-center gap-2">
+                        {adminUnlocked ? (
+                          <LockOpen className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Lock className="h-4 w-4" />
+                        )}
+                        <span>Admin Panel</span>
+                      </div>
                       {adminUnlocked ? (
-                        <Settings className="h-4 w-4" />
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform",
+                          adminOpen && "rotate-180"
+                        )} />
                       ) : (
-                        <Lock className="h-4 w-4" />
+                        <span className="text-xs text-muted-foreground">PIN required</span>
                       )}
-                      <span>Admin Panel</span>
-                    </div>
-                    {adminUnlocked ? (
-                      <ChevronDown className={cn(
-                        "h-4 w-4 transition-transform",
-                        adminOpen && "rotate-180"
-                      )} />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">PIN required</span>
-                    )}
-                  </SidebarGroupLabel>
-                </CollapsibleTrigger>
+                    </SidebarGroupLabel>
+                  </CollapsibleTrigger>
+                  {adminUnlocked && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={handleLockAdmin}
+                      title="Lock Admin Panel"
+                    >
+                      <Lock className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
                 <CollapsibleContent>
                   <SidebarGroupContent>
                     <SidebarMenu>
