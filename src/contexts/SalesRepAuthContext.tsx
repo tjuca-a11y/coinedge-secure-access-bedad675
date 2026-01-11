@@ -59,8 +59,8 @@ export const SalesRepAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return null;
     }
 
-    // Check if rep is active
-    if (repData.status !== 'active') {
+    // Check if rep is active or cleared (cleared = verified but first login)
+    if (repData.status !== 'active' && repData.status !== 'cleared') {
       return null;
     }
 
