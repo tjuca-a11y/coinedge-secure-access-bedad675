@@ -79,51 +79,34 @@ const AdminSalesReps: React.FC = () => {
     setIsCreating(true);
 
     try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: window.location.origin,
-        },
-      });
+      // Call the edge function to create the sales rep
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-sales-rep`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            full_name: formData.full_name,
+            email: formData.email,
+            phone: formData.phone,
+            dob: formData.dob,
+            password: formData.password,
+            status: formData.status,
+          }),
+        }
+      );
 
-      // Create user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'sales_rep',
-        });
+      const result = await response.json();
 
-      if (roleError) throw roleError;
-
-      // Create sales rep record
-      const { error: repError } = await supabase
-        .from('sales_reps')
-        .insert({
-          user_id: authData.user.id,
-          full_name: formData.full_name,
-          email: formData.email,
-          phone: formData.phone,
-          dob: formData.dob,
-          status: formData.status,
-          force_password_reset: true,
-        });
-
-      if (repError) throw repError;
-
-      // Log audit event
-      await supabase.from('audit_logs').insert({
-        event_id: `evt-${Date.now()}`,
-        actor_type: 'admin',
-        actor_id: (await supabase.auth.getUser()).data.user?.id,
-        action: 'create_sales_rep',
-        metadata: { rep_email: formData.email, rep_name: formData.full_name },
-      });
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create sales rep');
+      }
 
       toast({
         title: 'Sales Rep Created',
@@ -140,10 +123,11 @@ const AdminSalesReps: React.FC = () => {
         status: 'cleared',
       });
       queryClient.invalidateQueries({ queryKey: ['admin-sales-reps'] });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
