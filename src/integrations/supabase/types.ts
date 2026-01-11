@@ -14,6 +14,343 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          dob: string | null
+          email: string
+          force_password_reset: boolean
+          full_name: string
+          id: string
+          last_login_at: string | null
+          phone: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dob?: string | null
+          email: string
+          force_password_reset?: boolean
+          full_name: string
+          id?: string
+          last_login_at?: string | null
+          phone?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dob?: string | null
+          email?: string
+          force_password_reset?: boolean
+          full_name?: string
+          id?: string
+          last_login_at?: string | null
+          phone?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_type: Database["public"]["Enums"]["actor_type"]
+          created_at: string
+          event_id: string
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_type: Database["public"]["Enums"]["actor_type"]
+          created_at?: string
+          event_id: string
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_type?: Database["public"]["Enums"]["actor_type"]
+          created_at?: string
+          event_id?: string
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
+      bitcards: {
+        Row: {
+          activated_at: string | null
+          bitcard_id: string
+          created_at: string
+          id: string
+          issued_at: string
+          merchant_id: string | null
+          redeemed_at: string | null
+          status: Database["public"]["Enums"]["bitcard_status"]
+          usd_value: number
+        }
+        Insert: {
+          activated_at?: string | null
+          bitcard_id: string
+          created_at?: string
+          id?: string
+          issued_at?: string
+          merchant_id?: string | null
+          redeemed_at?: string | null
+          status?: Database["public"]["Enums"]["bitcard_status"]
+          usd_value: number
+        }
+        Update: {
+          activated_at?: string | null
+          bitcard_id?: string
+          created_at?: string
+          id?: string
+          issued_at?: string
+          merchant_id?: string | null
+          redeemed_at?: string | null
+          status?: Database["public"]["Enums"]["bitcard_status"]
+          usd_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bitcards_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_ledger: {
+        Row: {
+          activated_at: string
+          activation_fee_usd: number
+          bitcard_id: string | null
+          card_value_usd: number
+          coinedge_revenue_usd: number
+          commission_id: string
+          created_at: string
+          id: string
+          merchant_id: string | null
+          rep_commission_usd: number
+          rep_id: string | null
+          status: Database["public"]["Enums"]["commission_status"]
+        }
+        Insert: {
+          activated_at?: string
+          activation_fee_usd: number
+          bitcard_id?: string | null
+          card_value_usd: number
+          coinedge_revenue_usd: number
+          commission_id: string
+          created_at?: string
+          id?: string
+          merchant_id?: string | null
+          rep_commission_usd: number
+          rep_id?: string | null
+          status?: Database["public"]["Enums"]["commission_status"]
+        }
+        Update: {
+          activated_at?: string
+          activation_fee_usd?: number
+          bitcard_id?: string | null
+          card_value_usd?: number
+          coinedge_revenue_usd?: number
+          commission_id?: string
+          created_at?: string
+          id?: string
+          merchant_id?: string | null
+          rep_commission_usd?: number
+          rep_id?: string | null
+          status?: Database["public"]["Enums"]["commission_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_ledger_bitcard_id_fkey"
+            columns: ["bitcard_id"]
+            isOneToOne: false
+            referencedRelation: "bitcards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_ledger_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_ledger_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "sales_reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_invites: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          invite_code: string
+          invite_id: string
+          invite_token: string
+          merchant_id: string
+          rep_id: string | null
+          sent_to_email: string
+          status: Database["public"]["Enums"]["invite_status"]
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          invite_code: string
+          invite_id: string
+          invite_token: string
+          merchant_id: string
+          rep_id?: string | null
+          sent_to_email: string
+          status?: Database["public"]["Enums"]["invite_status"]
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_code?: string
+          invite_id?: string
+          invite_token?: string
+          merchant_id?: string
+          rep_id?: string | null
+          sent_to_email?: string
+          status?: Database["public"]["Enums"]["invite_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_invites_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merchant_invites_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "sales_reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_timeline: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          event_type: string
+          id: string
+          merchant_id: string
+          metadata: Json | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description: string
+          event_type: string
+          id?: string
+          merchant_id: string
+          metadata?: Json | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          event_type?: string
+          id?: string
+          merchant_id?: string
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_timeline_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchants: {
+        Row: {
+          business_name: string
+          city: string | null
+          created_at: string
+          email: string
+          id: string
+          lat: number | null
+          lng: number | null
+          merchant_id: string
+          phone: string
+          point_of_contact: string
+          rep_id: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["merchant_status"]
+          street: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          business_name: string
+          city?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          merchant_id: string
+          phone: string
+          point_of_contact: string
+          rep_id?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["merchant_status"]
+          street?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          business_name?: string
+          city?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          merchant_id?: string
+          phone?: string
+          point_of_contact?: string
+          rep_id?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["merchant_status"]
+          street?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchants_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "sales_reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address_line1: string | null
@@ -89,15 +426,110 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_reps: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dob: string
+          email: string
+          force_password_reset: boolean
+          full_name: string
+          id: string
+          last_login_at: string | null
+          phone: string
+          status: Database["public"]["Enums"]["rep_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dob: string
+          email: string
+          force_password_reset?: boolean
+          full_name: string
+          id?: string
+          last_login_at?: string | null
+          phone: string
+          status?: Database["public"]["Enums"]["rep_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dob?: string
+          email?: string
+          force_password_reset?: boolean
+          full_name?: string
+          id?: string
+          last_login_at?: string | null
+          phone?: string
+          status?: Database["public"]["Enums"]["rep_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_unique_id: { Args: { prefix: string }; Returns: string }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      actor_type: "admin" | "system" | "sales_rep"
+      app_role: "super_admin" | "admin" | "sales_rep"
+      bitcard_status: "issued" | "active" | "redeemed" | "expired" | "canceled"
+      commission_status: "accrued" | "approved" | "paid"
+      invite_status:
+        | "created"
+        | "sent"
+        | "opened"
+        | "started"
+        | "completed"
+        | "expired"
       kyc_status: "not_started" | "pending" | "approved" | "rejected"
+      merchant_status:
+        | "lead"
+        | "invited"
+        | "onboarding_started"
+        | "kyc_pending"
+        | "approved"
+        | "active"
+        | "paused"
+      rep_status: "draft" | "cleared" | "active" | "disabled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -225,7 +657,29 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      actor_type: ["admin", "system", "sales_rep"],
+      app_role: ["super_admin", "admin", "sales_rep"],
+      bitcard_status: ["issued", "active", "redeemed", "expired", "canceled"],
+      commission_status: ["accrued", "approved", "paid"],
+      invite_status: [
+        "created",
+        "sent",
+        "opened",
+        "started",
+        "completed",
+        "expired",
+      ],
       kyc_status: ["not_started", "pending", "approved", "rejected"],
+      merchant_status: [
+        "lead",
+        "invited",
+        "onboarding_started",
+        "kyc_pending",
+        "approved",
+        "active",
+        "paused",
+      ],
+      rep_status: ["draft", "cleared", "active", "disabled"],
     },
   },
 } as const
