@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useMerchantAuth } from '@/contexts/MerchantAuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,6 +46,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
+const ADMIN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
 export const MerchantSidebar: React.FC = () => {
   const { isMerchantAdmin, wallet, merchant } = useMerchantAuth();
   const location = useLocation();
@@ -57,6 +59,8 @@ export const MerchantSidebar: React.FC = () => {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   const adminLinks = [
     { to: '/merchant/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -75,6 +79,44 @@ export const MerchantSidebar: React.FC = () => {
   // Check if current route is an admin route
   const isOnAdminRoute = location.pathname.startsWith('/merchant/admin');
 
+  // Reset activity timer
+  const resetActivityTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+  }, []);
+
+  // Auto-lock after timeout
+  useEffect(() => {
+    if (!adminUnlocked) return;
+
+    const checkTimeout = () => {
+      const elapsed = Date.now() - lastActivityRef.current;
+      if (elapsed >= ADMIN_TIMEOUT_MS) {
+        setAdminUnlocked(false);
+        setAdminOpen(false);
+        if (location.pathname.startsWith('/merchant/admin')) {
+          navigate('/merchant/cashier');
+        }
+        toast({ 
+          title: 'Admin Panel Locked', 
+          description: 'Locked due to inactivity',
+          variant: 'default'
+        });
+      }
+    };
+
+    // Check every 30 seconds
+    timeoutRef.current = setInterval(checkTimeout, 30000);
+
+    // Activity listeners
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(event => window.addEventListener(event, resetActivityTimer));
+
+    return () => {
+      if (timeoutRef.current) clearInterval(timeoutRef.current);
+      events.forEach(event => window.removeEventListener(event, resetActivityTimer));
+    };
+  }, [adminUnlocked, navigate, resetActivityTimer, toast, location.pathname]);
+
   const handleAdminClick = () => {
     if (adminUnlocked) {
       setAdminOpen(!adminOpen);
@@ -85,12 +127,12 @@ export const MerchantSidebar: React.FC = () => {
     }
   };
 
-  const handleLockAdmin = () => {
+  const handleLockAdmin = useCallback(() => {
     setAdminUnlocked(false);
     setAdminOpen(false);
     navigate('/merchant/cashier');
     toast({ title: 'Admin Panel Locked', description: 'Access revoked' });
-  };
+  }, [navigate, toast]);
 
   const handlePinSubmit = async () => {
     if (!merchant?.id || !pin) return;
