@@ -5,8 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+import { SalesRepAuthProvider } from "@/contexts/SalesRepAuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminProtectedRoute } from "@/components/admin/AdminProtectedRoute";
+import { SalesRepProtectedRoute } from "@/components/sales-rep/SalesRepProtectedRoute";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Kyc from "./pages/Kyc";
@@ -28,6 +30,17 @@ import AdminCommissions from "./pages/admin/AdminCommissions";
 import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
 import AdminMap from "./pages/admin/AdminMap";
 
+// Sales Rep pages
+import SalesRepLogin from "./pages/sales-rep/SalesRepLogin";
+import SalesRepResetPassword from "./pages/sales-rep/SalesRepResetPassword";
+import SalesRepDashboard from "./pages/sales-rep/SalesRepDashboard";
+import SalesRepMerchants from "./pages/sales-rep/SalesRepMerchants";
+import SalesRepMerchantDetail from "./pages/sales-rep/SalesRepMerchantDetail";
+import SalesRepAddMerchant from "./pages/sales-rep/SalesRepAddMerchant";
+import SalesRepCommissions from "./pages/sales-rep/SalesRepCommissions";
+import SalesRepMap from "./pages/sales-rep/SalesRepMap";
+import SalesRepSettings from "./pages/sales-rep/SalesRepSettings";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -38,151 +51,58 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           {/* Admin Routes */}
-          <Route
-            path="/admin/login"
-            element={
-              <AdminAuthProvider>
-                <AdminLogin />
-              </AdminAuthProvider>
-            }
-          />
-          <Route
-            path="/admin/*"
-            element={
-              <AdminAuthProvider>
-                <Routes>
-                  <Route
-                    path="dashboard"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminDashboard />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="sales-reps"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminSalesReps />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="merchants"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminMerchants />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="bitcards"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminBitcards />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="commissions"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminCommissions />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="audit-logs"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminAuditLogs />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="map"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminMap />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-                </Routes>
-              </AdminAuthProvider>
-            }
-          />
+          <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
+          <Route path="/admin/*" element={
+            <AdminAuthProvider>
+              <Routes>
+                <Route path="dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+                <Route path="sales-reps" element={<AdminProtectedRoute><AdminSalesReps /></AdminProtectedRoute>} />
+                <Route path="merchants" element={<AdminProtectedRoute><AdminMerchants /></AdminProtectedRoute>} />
+                <Route path="bitcards" element={<AdminProtectedRoute><AdminBitcards /></AdminProtectedRoute>} />
+                <Route path="commissions" element={<AdminProtectedRoute><AdminCommissions /></AdminProtectedRoute>} />
+                <Route path="audit-logs" element={<AdminProtectedRoute><AdminAuditLogs /></AdminProtectedRoute>} />
+                <Route path="map" element={<AdminProtectedRoute><AdminMap /></AdminProtectedRoute>} />
+                <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+              </Routes>
+            </AdminAuthProvider>
+          } />
+
+          {/* Sales Rep Routes */}
+          <Route path="/rep/login" element={<SalesRepAuthProvider><SalesRepLogin /></SalesRepAuthProvider>} />
+          <Route path="/rep/*" element={
+            <SalesRepAuthProvider>
+              <Routes>
+                <Route path="reset-password" element={<SalesRepResetPassword />} />
+                <Route path="dashboard" element={<SalesRepProtectedRoute><SalesRepDashboard /></SalesRepProtectedRoute>} />
+                <Route path="merchants" element={<SalesRepProtectedRoute><SalesRepMerchants /></SalesRepProtectedRoute>} />
+                <Route path="merchants/:id" element={<SalesRepProtectedRoute><SalesRepMerchantDetail /></SalesRepProtectedRoute>} />
+                <Route path="add-merchant" element={<SalesRepProtectedRoute><SalesRepAddMerchant /></SalesRepProtectedRoute>} />
+                <Route path="commissions" element={<SalesRepProtectedRoute><SalesRepCommissions /></SalesRepProtectedRoute>} />
+                <Route path="map" element={<SalesRepProtectedRoute><SalesRepMap /></SalesRepProtectedRoute>} />
+                <Route path="settings" element={<SalesRepProtectedRoute><SalesRepSettings /></SalesRepProtectedRoute>} />
+                <Route path="*" element={<Navigate to="/rep/dashboard" replace />} />
+              </Routes>
+            </SalesRepAuthProvider>
+          } />
 
           {/* Customer Routes */}
-          <Route
-            path="/*"
-            element={
-              <AuthProvider>
-                <Routes>
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<SignUp />} />
-                  <Route path="/kyc" element={<Kyc />} />
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <Navigate to="/activity" replace />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/activity"
-                    element={
-                      <ProtectedRoute>
-                        <Activity />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/wallet"
-                    element={
-                      <ProtectedRoute>
-                        <Wallet />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/pay"
-                    element={
-                      <ProtectedRoute>
-                        <PayRequest />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <ProtectedRoute>
-                        <Settings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/settings/identity-verification"
-                    element={
-                      <ProtectedRoute>
-                        <IdentityVerification />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/redeem"
-                    element={
-                      <ProtectedRoute>
-                        <Redeem />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </AuthProvider>
-            }
-          />
+          <Route path="/*" element={
+            <AuthProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/kyc" element={<Kyc />} />
+                <Route path="/" element={<ProtectedRoute><Navigate to="/activity" replace /></ProtectedRoute>} />
+                <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+                <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
+                <Route path="/pay" element={<ProtectedRoute><PayRequest /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/settings/identity-verification" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
+                <Route path="/redeem" element={<ProtectedRoute><Redeem /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AuthProvider>
+          } />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
