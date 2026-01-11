@@ -8,14 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Scan, DollarSign, KeyRound, CheckCircle, Loader2, XCircle, Camera } from 'lucide-react';
+import { Scan, DollarSign, CheckCircle, Loader2, Camera } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const MerchantCashierPOS: React.FC = () => {
   const { merchant, merchantUser, wallet, refreshMerchantData } = useMerchantAuth();
   const [amount, setAmount] = useState('');
   const [bitcardId, setBitcardId] = useState('');
-  const [pin, setPin] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [activationSuccess, setActivationSuccess] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -96,17 +95,6 @@ const MerchantCashierPOS: React.FC = () => {
       if (card.status !== 'issued') throw new Error('Card already activated or invalid');
       if (card.usd_value !== null) throw new Error('Card already has a value');
 
-      // Verify PIN (simplified - in production use bcrypt comparison)
-      if (card.pin_hash !== pin) throw new Error('Invalid PIN');
-
-      // Log PIN attempt
-      await supabase.from('bitcard_pin_attempts').insert({
-        merchant_id: merchant.id,
-        bitcard_id: card.id,
-        success: true,
-        attempted_by_merchant_user_id: merchantUser.id,
-      });
-
       // Create activation event
       const { data: event, error: eventError } = await supabase
         .from('bitcard_activation_events')
@@ -150,16 +138,7 @@ const MerchantCashierPOS: React.FC = () => {
       toast({ title: 'Card Activated!', description: `$${amountNum.toFixed(2)} loaded` });
     },
     onError: (error: Error) => {
-      // Log failed attempt
-      if (merchant?.id && merchantUser?.id) {
-        supabase.from('bitcard_pin_attempts').insert({
-          merchant_id: merchant.id,
-          bitcard_id: null,
-          success: false,
-          attempted_by_merchant_user_id: merchantUser.id,
-        });
-      }
-      toast({ title: 'Activation Failed', description: 'Invalid card or PIN', variant: 'destructive' });
+      toast({ title: 'Activation Failed', description: error.message || 'Card not found or invalid', variant: 'destructive' });
     },
   });
 
@@ -167,7 +146,6 @@ const MerchantCashierPOS: React.FC = () => {
     setActivationSuccess(false);
     setAmount('');
     setBitcardId('');
-    setPin('');
   };
 
   if (activationSuccess) {
@@ -227,26 +205,10 @@ const MerchantCashierPOS: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* PIN Input */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <KeyRound className="h-6 w-6 text-primary" />
-              <Input
-                type="password"
-                placeholder="Enter scratch PIN"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                className="flex-1"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Activate Button */}
         <Button
           onClick={() => activateMutation.mutate()}
-          disabled={!amount || !bitcardId || !pin || activateMutation.isPending}
+          disabled={!amount || !bitcardId || activateMutation.isPending}
           size="lg"
           className="h-16 w-full text-xl"
         >

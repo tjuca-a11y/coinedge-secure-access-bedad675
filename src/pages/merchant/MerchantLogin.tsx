@@ -19,13 +19,10 @@ const MerchantLogin: React.FC = () => {
 
   useEffect(() => {
     if (!loading && user && merchantUser) {
-      if (isMerchantAdmin) {
-        navigate('/merchant/admin/dashboard');
-      } else {
-        navigate('/merchant/cashier');
-      }
+      // Always redirect to cashier POS as default view
+      navigate('/merchant/cashier');
     }
-  }, [user, merchantUser, isMerchantAdmin, loading, navigate]);
+  }, [user, merchantUser, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useMerchantAuth } from '@/contexts/MerchantAuthContext';
 import {
@@ -14,6 +14,11 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   LayoutDashboard,
   CreditCard,
   DollarSign,
@@ -22,12 +27,15 @@ import {
   Scan,
   Wallet,
   History,
+  ChevronDown,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const MerchantSidebar: React.FC = () => {
   const { isMerchantAdmin, wallet } = useMerchantAuth();
   const location = useLocation();
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const adminLinks = [
     { to: '/merchant/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -41,6 +49,9 @@ export const MerchantSidebar: React.FC = () => {
     { to: '/merchant/cashier', icon: Scan, label: 'POS Terminal' },
     { to: '/merchant/history', icon: History, label: 'Activation History' },
   ];
+
+  // Check if current route is an admin route
+  const isOnAdminRoute = location.pathname.startsWith('/merchant/admin');
 
   return (
     <Sidebar>
@@ -57,32 +68,7 @@ export const MerchantSidebar: React.FC = () => {
       </SidebarHeader>
 
       <SidebarContent>
-        {isMerchantAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Admin</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {adminLinks.map((link) => (
-                  <SidebarMenuItem key={link.to}>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to={link.to}
-                        className={cn(
-                          'flex items-center gap-2',
-                          location.pathname === link.to && 'bg-accent text-accent-foreground'
-                        )}
-                      >
-                        <link.icon className="h-4 w-4" />
-                        <span>{link.label}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
+        {/* Cashier section - always visible and at top */}
         <SidebarGroup>
           <SidebarGroupLabel>Cashier</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -106,6 +92,48 @@ export const MerchantSidebar: React.FC = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin section - collapsible and closed by default */}
+        {isMerchantAdmin && (
+          <Collapsible open={adminOpen || isOnAdminRoute} onOpenChange={setAdminOpen}>
+            <SidebarGroup>
+              <CollapsibleTrigger className="w-full">
+                <SidebarGroupLabel className="flex w-full cursor-pointer items-center justify-between pr-2 hover:bg-accent/50 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Admin Panel</span>
+                  </div>
+                  <ChevronDown className={cn(
+                    "h-4 w-4 transition-transform",
+                    (adminOpen || isOnAdminRoute) && "rotate-180"
+                  )} />
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {adminLinks.map((link) => (
+                      <SidebarMenuItem key={link.to}>
+                        <SidebarMenuButton asChild>
+                          <NavLink
+                            to={link.to}
+                            className={cn(
+                              'flex items-center gap-2',
+                              location.pathname === link.to && 'bg-accent text-accent-foreground'
+                            )}
+                          >
+                            <link.icon className="h-4 w-4" />
+                            <span>{link.label}</span>
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t p-4">
