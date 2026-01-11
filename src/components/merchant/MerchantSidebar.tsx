@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useMerchantAuth } from '@/contexts/MerchantAuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Sidebar,
   SidebarContent,
@@ -39,15 +40,13 @@ import {
   ChevronDown,
   Settings,
   Lock,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-// Simple admin PIN - in production this would be stored securely per merchant
-const ADMIN_PIN = '1234';
-
 export const MerchantSidebar: React.FC = () => {
-  const { isMerchantAdmin, wallet } = useMerchantAuth();
+  const { isMerchantAdmin, wallet, merchant } = useMerchantAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -56,6 +55,7 @@ export const MerchantSidebar: React.FC = () => {
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const adminLinks = [
     { to: '/merchant/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -83,22 +83,46 @@ export const MerchantSidebar: React.FC = () => {
     }
   };
 
-  const handlePinSubmit = () => {
-    if (pin === ADMIN_PIN) {
-      setAdminUnlocked(true);
-      setAdminOpen(true);
-      setPinDialogOpen(false);
-      setPin('');
-      setPinError(false);
-      toast({ title: 'Admin Panel Unlocked', description: 'Access granted' });
-    } else {
+  const handlePinSubmit = async () => {
+    if (!merchant?.id || !pin) return;
+    
+    setIsVerifying(true);
+    setPinError(false);
+    
+    try {
+      const { data, error } = await supabase.rpc('verify_admin_pin', {
+        merchant_id: merchant.id,
+        pin: pin
+      });
+      
+      if (error) {
+        console.error('PIN verification error:', error);
+        setPinError(true);
+        setPin('');
+        return;
+      }
+      
+      if (data === true) {
+        setAdminUnlocked(true);
+        setAdminOpen(true);
+        setPinDialogOpen(false);
+        setPin('');
+        toast({ title: 'Admin Panel Unlocked', description: 'Access granted' });
+      } else {
+        setPinError(true);
+        setPin('');
+      }
+    } catch (err) {
+      console.error('PIN verification failed:', err);
       setPinError(true);
       setPin('');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
   const handlePinKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isVerifying) {
       handlePinSubmit();
     }
   };
@@ -243,12 +267,24 @@ export const MerchantSidebar: React.FC = () => {
               )}
               maxLength={6}
               autoFocus
+              disabled={isVerifying}
             />
             {pinError && (
               <p className="text-sm text-destructive text-center">Incorrect PIN</p>
             )}
-            <Button onClick={handlePinSubmit} className="w-full" disabled={!pin}>
-              Unlock
+            <Button 
+              onClick={handlePinSubmit} 
+              className="w-full" 
+              disabled={!pin || isVerifying}
+            >
+              {isVerifying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Unlock'
+              )}
             </Button>
           </div>
         </DialogContent>

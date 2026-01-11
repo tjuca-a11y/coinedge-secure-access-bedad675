@@ -897,6 +897,7 @@ export type Database = {
       }
       merchants: {
         Row: {
+          admin_pin_hash: string | null
           business_name: string
           city: string | null
           created_at: string
@@ -915,6 +916,7 @@ export type Database = {
           zip: string | null
         }
         Insert: {
+          admin_pin_hash?: string | null
           business_name: string
           city?: string | null
           created_at?: string
@@ -933,6 +935,7 @@ export type Database = {
           zip?: string | null
         }
         Update: {
+          admin_pin_hash?: string | null
           business_name?: string
           city?: string | null
           created_at?: string
@@ -1241,6 +1244,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_admin_pin: { Args: { pin: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_merchant_admin: { Args: { _user_id: string }; Returns: boolean }
       is_merchant_cashier_or_admin: {
@@ -1250,6 +1254,10 @@ export type Database = {
       is_merchant_user: { Args: { _user_id: string }; Returns: boolean }
       reverse_allocations: {
         Args: { p_fulfillment_id: string }
+        Returns: boolean
+      }
+      verify_admin_pin: {
+        Args: { merchant_id: string; pin: string }
         Returns: boolean
       }
     }
