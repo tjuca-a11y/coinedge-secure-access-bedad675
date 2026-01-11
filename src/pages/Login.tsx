@@ -15,8 +15,8 @@ const Login: React.FC = () => {
   }
 
   if (user) {
-    // If user is logged in, route based on KYC status
-    return isKycApproved ? <Navigate to="/" replace /> : <Navigate to="/kyc" replace />;
+    // If user is logged in, go to dashboard (KYC only required for redemption)
+    return <Navigate to="/" replace />;
   }
 
   return (

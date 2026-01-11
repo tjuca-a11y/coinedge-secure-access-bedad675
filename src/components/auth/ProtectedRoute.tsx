@@ -29,14 +29,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If KYC is required and not approved, redirect to KYC
+  // Only redirect to KYC if explicitly required (e.g., for redemption)
   if (requireKyc && !isKycApproved) {
-    return <Navigate to="/kyc" replace />;
-  }
-
-  // If on a protected page and KYC is not approved, always redirect to KYC
-  // (except if we're already on the KYC page)
-  if (!isKycApproved && kycStatus !== null && location.pathname !== '/kyc') {
     return <Navigate to="/kyc" replace />;
   }
 
