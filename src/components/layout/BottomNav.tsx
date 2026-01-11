@@ -5,7 +5,7 @@ import { Wallet, ArrowUpDown, Activity, Settings } from "lucide-react";
 
 const navItems = [
   { title: "Wallet", url: "/wallet", icon: Wallet },
-  { title: "Send", url: "/pay", icon: ArrowUpDown },
+  { title: "Send", url: "/send", icon: ArrowUpDown },
   { title: "Activity", url: "/activity", icon: Activity },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
