@@ -47,20 +47,55 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 const ADMIN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const ADMIN_UNLOCK_KEY = 'merchant_admin_unlocked';
+const ADMIN_ACTIVITY_KEY = 'merchant_admin_last_activity';
 
 export const MerchantSidebar: React.FC = () => {
   const { isMerchantAdmin, wallet, merchant } = useMerchantAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  
+  // Initialize from sessionStorage to persist across navigation
+  const [adminOpen, setAdminOpen] = useState(() => {
+    return sessionStorage.getItem(ADMIN_UNLOCK_KEY) === 'true';
+  });
+  const [adminUnlocked, setAdminUnlocked] = useState(() => {
+    const unlocked = sessionStorage.getItem(ADMIN_UNLOCK_KEY) === 'true';
+    const lastActivity = sessionStorage.getItem(ADMIN_ACTIVITY_KEY);
+    if (unlocked && lastActivity) {
+      // Check if session has expired
+      const elapsed = Date.now() - parseInt(lastActivity, 10);
+      if (elapsed >= ADMIN_TIMEOUT_MS) {
+        sessionStorage.removeItem(ADMIN_UNLOCK_KEY);
+        sessionStorage.removeItem(ADMIN_ACTIVITY_KEY);
+        return false;
+      }
+    }
+    return unlocked;
+  });
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
+  const getInitialActivity = () => {
+    const stored = sessionStorage.getItem(ADMIN_ACTIVITY_KEY);
+    return stored ? parseInt(stored, 10) : Date.now();
+  };
+  const lastActivityRef = useRef<number>(getInitialActivity());
+
+  // Sync unlock state to sessionStorage
+  useEffect(() => {
+    if (adminUnlocked) {
+      sessionStorage.setItem(ADMIN_UNLOCK_KEY, 'true');
+      sessionStorage.setItem(ADMIN_ACTIVITY_KEY, Date.now().toString());
+      lastActivityRef.current = Date.now();
+    } else {
+      sessionStorage.removeItem(ADMIN_UNLOCK_KEY);
+      sessionStorage.removeItem(ADMIN_ACTIVITY_KEY);
+    }
+  }, [adminUnlocked]);
 
   const adminLinks = [
     { to: '/merchant/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -82,6 +117,7 @@ export const MerchantSidebar: React.FC = () => {
   // Reset activity timer
   const resetActivityTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
+    sessionStorage.setItem(ADMIN_ACTIVITY_KEY, Date.now().toString());
   }, []);
 
   // Auto-lock after timeout
