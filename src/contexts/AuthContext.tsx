@@ -11,7 +11,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, username: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -83,15 +83,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (email: string, password: string, fullName: string, username: string) => {
+    // First create the auth user
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: window.location.origin,
       },
     });
-    return { error: error as Error | null };
+
+    if (error) {
+      return { error: error as Error };
+    }
+
+    // If signup succeeded, update the profile with name and username
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          username: username.toLowerCase(),
+          email: email,
+        })
+        .eq('user_id', data.user.id);
+
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+        return { error: new Error(profileError.message) };
+      }
+    }
+
+    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {

@@ -4,20 +4,91 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AtSign } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export const SignUpForm: React.FC = () => {
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
   const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
+  // Validate username format
+  const validateUsername = (value: string): boolean => {
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!value) {
+      setUsernameError('Username is required');
+      return false;
+    }
+    if (value.length < 3) {
+      setUsernameError('Username must be at least 3 characters');
+      return false;
+    }
+    if (value.length > 20) {
+      setUsernameError('Username must be less than 20 characters');
+      return false;
+    }
+    if (!usernameRegex.test(value)) {
+      setUsernameError('Only letters, numbers, and underscores allowed');
+      return false;
+    }
+    setUsernameError('');
+    return true;
+  };
+
+  // Check if username is available
+  const checkUsernameAvailable = async (value: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', value.toLowerCase())
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking username:', error);
+      return true; // Allow to proceed, server will catch duplicates
+    }
+    
+    if (data) {
+      setUsernameError('Username is already taken');
+      return false;
+    }
+    return true;
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    setUsername(value);
+    if (value) {
+      validateUsername(value);
+    } else {
+      setUsernameError('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!fullName.trim()) {
+      toast.error('Please enter your name');
+      return;
+    }
+
+    if (!validateUsername(username)) {
+      return;
+    }
+
+    const isAvailable = await checkUsernameAvailable(username);
+    if (!isAvailable) {
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
@@ -31,7 +102,7 @@ export const SignUpForm: React.FC = () => {
 
     setLoading(true);
 
-    const { error } = await signUp(email, password);
+    const { error } = await signUp(email, password, fullName.trim(), username);
 
     if (error) {
       toast.error(error.message);
@@ -39,8 +110,8 @@ export const SignUpForm: React.FC = () => {
       return;
     }
 
-    toast.success('Account created! Please complete identity verification.');
-    navigate('/kyc');
+    toast.success('Account created successfully!');
+    navigate('/');
   };
 
   const handleGoogleSignUp = async () => {
@@ -66,15 +137,54 @@ export const SignUpForm: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
+          <Label htmlFor="fullName">Full Name</Label>
+          <Input
+            id="fullName"
+            type="text"
+            placeholder="John Doe"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            disabled={loading}
+            maxLength={100}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="username">Username</Label>
+          <div className="relative">
+            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="username"
+              type="text"
+              placeholder="johndoe"
+              value={username}
+              onChange={handleUsernameChange}
+              required
+              disabled={loading}
+              className="pl-9"
+              maxLength={20}
+            />
+          </div>
+          {usernameError && (
+            <p className="text-sm text-destructive">{usernameError}</p>
+          )}
+          {username && !usernameError && (
+            <p className="text-sm text-muted-foreground">@{username}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
             type="email"
-            placeholder="Email"
+            placeholder="john@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             disabled={loading}
+            maxLength={255}
           />
         </div>
 
