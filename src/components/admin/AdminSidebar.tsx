@@ -23,6 +23,10 @@ const navItems = [
   { path: '/admin/bitcards', label: 'BitCards', icon: CreditCard },
   { path: '/admin/sales-reps', label: 'Sales Reps', icon: Users },
   { path: '/admin/commissions', label: 'Commissions', icon: DollarSign },
+  { path: '/admin/inventory', label: 'BTC Inventory', icon: Shield },
+  { path: '/admin/inventory-lots', label: 'Inventory Lots', icon: CreditCard },
+  { path: '/admin/fulfillment', label: 'Fulfillment Queue', icon: FileText },
+  { path: '/admin/system-controls', label: 'System Controls', icon: Store },
   { path: '/admin/audit-logs', label: 'Audit Logs', icon: FileText },
 ];
 
