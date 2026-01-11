@@ -136,7 +136,7 @@ const App = () => (
                 <Route path="/" element={<ProtectedRoute><Navigate to="/activity" replace /></ProtectedRoute>} />
                 <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
                 <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-                <Route path="/pay" element={<ProtectedRoute><PayRequest /></ProtectedRoute>} />
+                <Route path="/send" element={<ProtectedRoute><PayRequest /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/settings/identity-verification" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
                 <Route path="/redeem" element={<ProtectedRoute><Redeem /></ProtectedRoute>} />
