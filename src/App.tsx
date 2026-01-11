@@ -6,9 +6,11 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { SalesRepAuthProvider } from "@/contexts/SalesRepAuthContext";
+import { MerchantAuthProvider } from "@/contexts/MerchantAuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminProtectedRoute } from "@/components/admin/AdminProtectedRoute";
 import { SalesRepProtectedRoute } from "@/components/sales-rep/SalesRepProtectedRoute";
+import { MerchantProtectedRoute } from "@/components/merchant/MerchantProtectedRoute";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Kyc from "./pages/Kyc";
@@ -44,6 +46,16 @@ import SalesRepAddMerchant from "./pages/sales-rep/SalesRepAddMerchant";
 import SalesRepCommissions from "./pages/sales-rep/SalesRepCommissions";
 import SalesRepMap from "./pages/sales-rep/SalesRepMap";
 import SalesRepSettings from "./pages/sales-rep/SalesRepSettings";
+
+// Merchant pages
+import MerchantLogin from "./pages/merchant/MerchantLogin";
+import MerchantResetPassword from "./pages/merchant/MerchantResetPassword";
+import MerchantAdminDashboard from "./pages/merchant/admin/MerchantAdminDashboard";
+import MerchantAddBalance from "./pages/merchant/admin/MerchantAddBalance";
+import MerchantOrderCards from "./pages/merchant/admin/MerchantOrderCards";
+import MerchantOrders from "./pages/merchant/admin/MerchantOrders";
+import MerchantCashiers from "./pages/merchant/admin/MerchantCashiers";
+import MerchantCashierPOS from "./pages/merchant/MerchantCashierPOS";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +103,23 @@ const App = () => (
                 <Route path="*" element={<Navigate to="/rep/dashboard" replace />} />
               </Routes>
             </SalesRepAuthProvider>
+          } />
+
+          {/* Merchant Routes */}
+          <Route path="/merchant/login" element={<MerchantAuthProvider><MerchantLogin /></MerchantAuthProvider>} />
+          <Route path="/merchant/*" element={
+            <MerchantAuthProvider>
+              <Routes>
+                <Route path="reset-password" element={<MerchantResetPassword />} />
+                <Route path="admin/dashboard" element={<MerchantProtectedRoute requireAdmin><MerchantAdminDashboard /></MerchantProtectedRoute>} />
+                <Route path="admin/add-balance" element={<MerchantProtectedRoute requireAdmin><MerchantAddBalance /></MerchantProtectedRoute>} />
+                <Route path="admin/order-cards" element={<MerchantProtectedRoute requireAdmin><MerchantOrderCards /></MerchantProtectedRoute>} />
+                <Route path="admin/orders" element={<MerchantProtectedRoute requireAdmin><MerchantOrders /></MerchantProtectedRoute>} />
+                <Route path="admin/cashiers" element={<MerchantProtectedRoute requireAdmin><MerchantCashiers /></MerchantProtectedRoute>} />
+                <Route path="cashier" element={<MerchantProtectedRoute><MerchantCashierPOS /></MerchantProtectedRoute>} />
+                <Route path="*" element={<Navigate to="/merchant/cashier" replace />} />
+              </Routes>
+            </MerchantAuthProvider>
           } />
 
           {/* Customer Routes */}

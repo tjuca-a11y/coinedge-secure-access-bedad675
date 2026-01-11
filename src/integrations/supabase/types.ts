@@ -83,41 +83,158 @@ export type Database = {
         }
         Relationships: []
       }
+      bitcard_activation_events: {
+        Row: {
+          activated_by_merchant_user_id: string
+          activation_method: Database["public"]["Enums"]["activation_method"]
+          bitcard_id: string
+          created_at: string
+          id: string
+          merchant_id: string
+          usd_value: number
+        }
+        Insert: {
+          activated_by_merchant_user_id: string
+          activation_method?: Database["public"]["Enums"]["activation_method"]
+          bitcard_id: string
+          created_at?: string
+          id?: string
+          merchant_id: string
+          usd_value: number
+        }
+        Update: {
+          activated_by_merchant_user_id?: string
+          activation_method?: Database["public"]["Enums"]["activation_method"]
+          bitcard_id?: string
+          created_at?: string
+          id?: string
+          merchant_id?: string
+          usd_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bitcard_activation_events_activated_by_merchant_user_id_fkey"
+            columns: ["activated_by_merchant_user_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bitcard_activation_events_bitcard_id_fkey"
+            columns: ["bitcard_id"]
+            isOneToOne: false
+            referencedRelation: "bitcards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bitcard_activation_events_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bitcard_pin_attempts: {
+        Row: {
+          attempted_at: string
+          attempted_by_merchant_user_id: string
+          bitcard_id: string | null
+          id: string
+          merchant_id: string
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string
+          attempted_by_merchant_user_id: string
+          bitcard_id?: string | null
+          id?: string
+          merchant_id: string
+          success?: boolean
+        }
+        Update: {
+          attempted_at?: string
+          attempted_by_merchant_user_id?: string
+          bitcard_id?: string | null
+          id?: string
+          merchant_id?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bitcard_pin_attempts_attempted_by_merchant_user_id_fkey"
+            columns: ["attempted_by_merchant_user_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bitcard_pin_attempts_bitcard_id_fkey"
+            columns: ["bitcard_id"]
+            isOneToOne: false
+            referencedRelation: "bitcards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bitcard_pin_attempts_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bitcards: {
         Row: {
           activated_at: string | null
+          activated_by_merchant_user_id: string | null
           bitcard_id: string
           created_at: string
           id: string
           issued_at: string
           merchant_id: string | null
+          pin_hash: string | null
+          pin_required: boolean
           redeemed_at: string | null
           status: Database["public"]["Enums"]["bitcard_status"]
-          usd_value: number
+          usd_value: number | null
         }
         Insert: {
           activated_at?: string | null
+          activated_by_merchant_user_id?: string | null
           bitcard_id: string
           created_at?: string
           id?: string
           issued_at?: string
           merchant_id?: string | null
+          pin_hash?: string | null
+          pin_required?: boolean
           redeemed_at?: string | null
           status?: Database["public"]["Enums"]["bitcard_status"]
-          usd_value: number
+          usd_value?: number | null
         }
         Update: {
           activated_at?: string | null
+          activated_by_merchant_user_id?: string | null
           bitcard_id?: string
           created_at?: string
           id?: string
           issued_at?: string
           merchant_id?: string | null
+          pin_hash?: string | null
+          pin_required?: boolean
           redeemed_at?: string | null
           status?: Database["public"]["Enums"]["bitcard_status"]
-          usd_value?: number
+          usd_value?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "bitcards_activated_by_merchant_user_id_fkey"
+            columns: ["activated_by_merchant_user_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bitcards_merchant_id_fkey"
             columns: ["merchant_id"]
@@ -126,6 +243,118 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      card_orders: {
+        Row: {
+          created_at: string
+          created_by_merchant_user_id: string | null
+          id: string
+          merchant_id: string
+          product_id: string
+          quantity: number
+          shipping_address_line1: string
+          shipping_address_line2: string | null
+          shipping_city: string
+          shipping_country: string
+          shipping_name: string
+          shipping_phone: string
+          shipping_state: string
+          shipping_zip: string
+          status: Database["public"]["Enums"]["card_order_status"]
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_merchant_user_id?: string | null
+          id?: string
+          merchant_id: string
+          product_id: string
+          quantity?: number
+          shipping_address_line1: string
+          shipping_address_line2?: string | null
+          shipping_city: string
+          shipping_country?: string
+          shipping_name: string
+          shipping_phone: string
+          shipping_state: string
+          shipping_zip: string
+          status?: Database["public"]["Enums"]["card_order_status"]
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_merchant_user_id?: string | null
+          id?: string
+          merchant_id?: string
+          product_id?: string
+          quantity?: number
+          shipping_address_line1?: string
+          shipping_address_line2?: string | null
+          shipping_city?: string
+          shipping_country?: string
+          shipping_name?: string
+          shipping_phone?: string
+          shipping_state?: string
+          shipping_zip?: string
+          status?: Database["public"]["Enums"]["card_order_status"]
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_orders_created_by_merchant_user_id_fkey"
+            columns: ["created_by_merchant_user_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_orders_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "card_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_products: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          pack_size: number
+          price_usd: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          pack_size?: number
+          price_usd: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          pack_size?: number
+          price_usd?: number
+        }
+        Relationships: []
       }
       commission_ledger: {
         Row: {
@@ -408,6 +637,48 @@ export type Database = {
           },
         ]
       }
+      merchant_audit_logs: {
+        Row: {
+          action: string
+          actor_merchant_user_id: string | null
+          created_at: string
+          id: string
+          merchant_id: string
+          metadata_json: Json | null
+        }
+        Insert: {
+          action: string
+          actor_merchant_user_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_id: string
+          metadata_json?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_merchant_user_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_id?: string
+          metadata_json?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_audit_logs_actor_merchant_user_id_fkey"
+            columns: ["actor_merchant_user_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merchant_audit_logs_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchant_invites: {
         Row: {
           created_at: string
@@ -495,6 +766,130 @@ export type Database = {
             foreignKeyName: "merchant_timeline_merchant_id_fkey"
             columns: ["merchant_id"]
             isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_users: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          last_login_at: string | null
+          merchant_id: string
+          must_reset_password: boolean
+          phone: string | null
+          role: Database["public"]["Enums"]["merchant_user_role"]
+          status: Database["public"]["Enums"]["merchant_user_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          last_login_at?: string | null
+          merchant_id: string
+          must_reset_password?: boolean
+          phone?: string | null
+          role?: Database["public"]["Enums"]["merchant_user_role"]
+          status?: Database["public"]["Enums"]["merchant_user_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          last_login_at?: string | null
+          merchant_id?: string
+          must_reset_password?: boolean
+          phone?: string | null
+          role?: Database["public"]["Enums"]["merchant_user_role"]
+          status?: Database["public"]["Enums"]["merchant_user_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_users_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_wallet_ledger: {
+        Row: {
+          amount_usd: number
+          created_at: string
+          created_by_merchant_user_id: string | null
+          id: string
+          merchant_id: string
+          reference: string | null
+          type: Database["public"]["Enums"]["merchant_ledger_type"]
+        }
+        Insert: {
+          amount_usd: number
+          created_at?: string
+          created_by_merchant_user_id?: string | null
+          id?: string
+          merchant_id: string
+          reference?: string | null
+          type: Database["public"]["Enums"]["merchant_ledger_type"]
+        }
+        Update: {
+          amount_usd?: number
+          created_at?: string
+          created_by_merchant_user_id?: string | null
+          id?: string
+          merchant_id?: string
+          reference?: string | null
+          type?: Database["public"]["Enums"]["merchant_ledger_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_wallet_ledger_created_by_merchant_user_id_fkey"
+            columns: ["created_by_merchant_user_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merchant_wallet_ledger_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_wallets: {
+        Row: {
+          balance_usd: number
+          id: string
+          merchant_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance_usd?: number
+          id?: string
+          merchant_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance_usd?: number
+          id?: string
+          merchant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_wallets_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: true
             referencedRelation: "merchants"
             referencedColumns: ["id"]
           },
@@ -682,6 +1077,54 @@ export type Database = {
         }
         Relationships: []
       }
+      square_payments: {
+        Row: {
+          amount_usd: number
+          created_at: string
+          created_by_merchant_user_id: string | null
+          id: string
+          merchant_id: string
+          square_payment_id: string | null
+          status: Database["public"]["Enums"]["square_payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_usd: number
+          created_at?: string
+          created_by_merchant_user_id?: string | null
+          id?: string
+          merchant_id: string
+          square_payment_id?: string | null
+          status?: Database["public"]["Enums"]["square_payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_usd?: number
+          created_at?: string
+          created_by_merchant_user_id?: string | null
+          id?: string
+          merchant_id?: string
+          square_payment_id?: string | null
+          status?: Database["public"]["Enums"]["square_payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "square_payments_created_by_merchant_user_id_fkey"
+            columns: ["created_by_merchant_user_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "square_payments_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           created_at: string
@@ -786,6 +1229,7 @@ export type Database = {
           total_btc: number
         }[]
       }
+      get_merchant_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -798,15 +1242,29 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_merchant_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_merchant_cashier_or_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_merchant_user: { Args: { _user_id: string }; Returns: boolean }
       reverse_allocations: {
         Args: { p_fulfillment_id: string }
         Returns: boolean
       }
     }
     Enums: {
+      activation_method: "QR_PIN" | "MANUAL"
       actor_type: "admin" | "system" | "sales_rep"
       app_role: "super_admin" | "admin" | "sales_rep"
       bitcard_status: "issued" | "active" | "redeemed" | "expired" | "canceled"
+      card_order_status:
+        | "SUBMITTED"
+        | "PAID"
+        | "PROCESSING"
+        | "SHIPPED"
+        | "DELIVERED"
+        | "CANCELED"
       commission_status: "accrued" | "approved" | "paid"
       fulfillment_order_type: "BITCARD_REDEMPTION" | "BUY_ORDER"
       fulfillment_status:
@@ -828,6 +1286,7 @@ export type Database = {
         | "expired"
       kyc_fulfillment_status: "PENDING" | "APPROVED" | "REJECTED"
       kyc_status: "not_started" | "pending" | "approved" | "rejected"
+      merchant_ledger_type: "TOPUP" | "ACTIVATION_DEBIT" | "ADJUSTMENT"
       merchant_status:
         | "lead"
         | "invited"
@@ -836,7 +1295,10 @@ export type Database = {
         | "approved"
         | "active"
         | "paused"
+      merchant_user_role: "MERCHANT_ADMIN" | "CASHIER"
+      merchant_user_status: "ACTIVE" | "DISABLED"
       rep_status: "draft" | "cleared" | "active" | "disabled"
+      square_payment_status: "CREATED" | "PAID" | "FAILED" | "CANCELED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -964,9 +1426,18 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activation_method: ["QR_PIN", "MANUAL"],
       actor_type: ["admin", "system", "sales_rep"],
       app_role: ["super_admin", "admin", "sales_rep"],
       bitcard_status: ["issued", "active", "redeemed", "expired", "canceled"],
+      card_order_status: [
+        "SUBMITTED",
+        "PAID",
+        "PROCESSING",
+        "SHIPPED",
+        "DELIVERED",
+        "CANCELED",
+      ],
       commission_status: ["accrued", "approved", "paid"],
       fulfillment_order_type: ["BITCARD_REDEMPTION", "BUY_ORDER"],
       fulfillment_status: [
@@ -990,6 +1461,7 @@ export const Constants = {
       ],
       kyc_fulfillment_status: ["PENDING", "APPROVED", "REJECTED"],
       kyc_status: ["not_started", "pending", "approved", "rejected"],
+      merchant_ledger_type: ["TOPUP", "ACTIVATION_DEBIT", "ADJUSTMENT"],
       merchant_status: [
         "lead",
         "invited",
@@ -999,7 +1471,10 @@ export const Constants = {
         "active",
         "paused",
       ],
+      merchant_user_role: ["MERCHANT_ADMIN", "CASHIER"],
+      merchant_user_status: ["ACTIVE", "DISABLED"],
       rep_status: ["draft", "cleared", "active", "disabled"],
+      square_payment_status: ["CREATED", "PAID", "FAILED", "CANCELED"],
     },
   },
 } as const
