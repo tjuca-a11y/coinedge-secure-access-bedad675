@@ -314,7 +314,7 @@ const PayRequest: React.FC = () => {
               disabled={!isKycApproved}
               className="flex-1 h-12 md:h-14 text-base md:text-lg font-medium rounded-full bg-muted hover:bg-muted/80 text-foreground"
             >
-              Pay
+              Send
             </Button>
           </div>
 
