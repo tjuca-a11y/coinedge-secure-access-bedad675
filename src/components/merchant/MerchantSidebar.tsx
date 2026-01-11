@@ -21,6 +21,7 @@ import {
   Users,
   Scan,
   Wallet,
+  History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +39,7 @@ export const MerchantSidebar: React.FC = () => {
 
   const cashierLinks = [
     { to: '/merchant/cashier', icon: Scan, label: 'POS Terminal' },
+    { to: '/merchant/history', icon: History, label: 'Activation History' },
   ];
 
   return (
