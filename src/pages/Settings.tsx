@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,13 +7,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Bell, Key, LogOut } from "lucide-react";
+import { User, Shield, Bell, Key, LogOut, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import IdentityVerificationCard from "@/components/settings/IdentityVerificationCard";
 
 const Settings: React.FC = () => {
-  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { user, profile, signOut, kycStatus } = useAuth();
+
+  const getKycBadge = () => {
+    if (kycStatus === "approved") {
+      return <Badge className="bg-success/10 text-success hover:bg-success/20">Tier 2 Verified</Badge>;
+    }
+    if (kycStatus === "pending") {
+      return <Badge className="bg-warning/10 text-warning hover:bg-warning/20">Pending</Badge>;
+    }
+    return <Badge variant="secondary">Tier 0</Badge>;
+  };
 
   return (
     <DashboardLayout title="Settings" subtitle="Manage your account and preferences">
@@ -51,7 +63,28 @@ const Settings: React.FC = () => {
         </Card>
 
         {/* Identity Verification */}
-        <IdentityVerificationCard />
+        <Card 
+          className="cursor-pointer hover:bg-accent/50 transition-colors"
+          onClick={() => navigate("/settings/identity-verification")}
+        >
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-full">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Identity Verification</p>
+                  <p className="text-sm text-muted-foreground">KYC status and verification details</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {getKycBadge()}
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Notifications */}
         <Card>
