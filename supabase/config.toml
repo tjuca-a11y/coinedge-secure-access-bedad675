@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.create-demo-merchant]
 verify_jwt = false
+
+[functions.fireblocks-transfer]
+verify_jwt = false
+
+[functions.plaid-link]
+verify_jwt = false
+
+[functions.plaid-transfer]
+verify_jwt = false

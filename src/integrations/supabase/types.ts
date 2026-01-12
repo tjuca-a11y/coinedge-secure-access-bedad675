@@ -356,6 +356,71 @@ export type Database = {
         }
         Relationships: []
       }
+      cashout_orders: {
+        Row: {
+          bank_account_id: string
+          completed_at: string | null
+          conversion_rate: number | null
+          created_at: string
+          estimated_arrival: string | null
+          failed_reason: string | null
+          fee_usd: number
+          id: string
+          order_id: string
+          plaid_transfer_id: string | null
+          source_amount: number
+          source_asset: string
+          status: string
+          updated_at: string
+          usd_amount: number
+          user_id: string
+        }
+        Insert: {
+          bank_account_id: string
+          completed_at?: string | null
+          conversion_rate?: number | null
+          created_at?: string
+          estimated_arrival?: string | null
+          failed_reason?: string | null
+          fee_usd?: number
+          id?: string
+          order_id?: string
+          plaid_transfer_id?: string | null
+          source_amount: number
+          source_asset: string
+          status?: string
+          updated_at?: string
+          usd_amount: number
+          user_id: string
+        }
+        Update: {
+          bank_account_id?: string
+          completed_at?: string | null
+          conversion_rate?: number | null
+          created_at?: string
+          estimated_arrival?: string | null
+          failed_reason?: string | null
+          fee_usd?: number
+          id?: string
+          order_id?: string
+          plaid_transfer_id?: string | null
+          source_amount?: number
+          source_asset?: string
+          status?: string
+          updated_at?: string
+          usd_amount?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashout_orders_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "user_bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_ledger: {
         Row: {
           activated_at: string
@@ -434,8 +499,10 @@ export type Database = {
           failed_reason: string | null
           fee_usdc: number
           id: string
+          inventory_allocated: boolean | null
           order_id: string
           order_type: Database["public"]["Enums"]["swap_order_type"]
+          source_usdc_address: string | null
           status: Database["public"]["Enums"]["swap_order_status"]
           tx_hash: string | null
           updated_at: string
@@ -451,8 +518,10 @@ export type Database = {
           failed_reason?: string | null
           fee_usdc?: number
           id?: string
+          inventory_allocated?: boolean | null
           order_id?: string
           order_type: Database["public"]["Enums"]["swap_order_type"]
+          source_usdc_address?: string | null
           status?: Database["public"]["Enums"]["swap_order_status"]
           tx_hash?: string | null
           updated_at?: string
@@ -468,8 +537,10 @@ export type Database = {
           failed_reason?: string | null
           fee_usdc?: number
           id?: string
+          inventory_allocated?: boolean | null
           order_id?: string
           order_type?: Database["public"]["Enums"]["swap_order_type"]
+          source_usdc_address?: string | null
           status?: Database["public"]["Enums"]["swap_order_status"]
           tx_hash?: string | null
           updated_at?: string
@@ -1217,6 +1288,7 @@ export type Database = {
       }
       treasury_wallet: {
         Row: {
+          asset_type: string | null
           btc_address: string | null
           created_at: string
           fireblocks_vault_id: string
@@ -1225,8 +1297,10 @@ export type Database = {
           is_active: boolean
           label: string | null
           updated_at: string
+          usdc_address: string | null
         }
         Insert: {
+          asset_type?: string | null
           btc_address?: string | null
           created_at?: string
           fireblocks_vault_id: string
@@ -1235,8 +1309,10 @@ export type Database = {
           is_active?: boolean
           label?: string | null
           updated_at?: string
+          usdc_address?: string | null
         }
         Update: {
+          asset_type?: string | null
           btc_address?: string | null
           created_at?: string
           fireblocks_vault_id?: string
@@ -1245,6 +1321,99 @@ export type Database = {
           is_active?: boolean
           label?: string | null
           updated_at?: string
+          usdc_address?: string | null
+        }
+        Relationships: []
+      }
+      usdc_inventory_lots: {
+        Row: {
+          amount_usdc_available: number
+          amount_usdc_total: number
+          created_at: string
+          created_by_admin_id: string | null
+          id: string
+          notes: string | null
+          received_at: string
+          reference_id: string | null
+          source: string
+          treasury_wallet_id: string
+        }
+        Insert: {
+          amount_usdc_available: number
+          amount_usdc_total: number
+          created_at?: string
+          created_by_admin_id?: string | null
+          id?: string
+          notes?: string | null
+          received_at?: string
+          reference_id?: string | null
+          source?: string
+          treasury_wallet_id: string
+        }
+        Update: {
+          amount_usdc_available?: number
+          amount_usdc_total?: number
+          created_at?: string
+          created_by_admin_id?: string | null
+          id?: string
+          notes?: string | null
+          received_at?: string
+          reference_id?: string | null
+          source?: string
+          treasury_wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usdc_inventory_lots_treasury_wallet_id_fkey"
+            columns: ["treasury_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "treasury_wallet"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_bank_accounts: {
+        Row: {
+          account_mask: string
+          account_type: string
+          bank_name: string
+          created_at: string
+          id: string
+          is_primary: boolean | null
+          is_verified: boolean | null
+          plaid_access_token: string | null
+          plaid_account_id: string | null
+          plaid_item_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_mask: string
+          account_type?: string
+          bank_name: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          plaid_access_token?: string | null
+          plaid_account_id?: string | null
+          plaid_item_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_mask?: string
+          account_type?: string
+          bank_name?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          plaid_access_token?: string | null
+          plaid_account_id?: string | null
+          plaid_item_id?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1290,6 +1459,14 @@ export type Database = {
         }[]
       }
       get_merchant_id_for_user: { Args: { _user_id: string }; Returns: string }
+      get_usdc_inventory_stats: {
+        Args: never
+        Returns: {
+          available_usdc: number
+          lots_count: number
+          total_usdc: number
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
