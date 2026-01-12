@@ -83,10 +83,10 @@ const Wallet: React.FC = () => {
           isRefreshing={isRefreshing} 
         />
 
-        {/* Total Balance Card */}
+        {/* Portfolio Value Card */}
         <Card className="mb-4 md:mb-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
           <CardContent className="py-6">
-            <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
+            <p className="text-sm text-muted-foreground mb-1">Portfolio Value</p>
             <p className="text-3xl md:text-4xl font-bold">${totalBalance.toFixed(2)}</p>
             <div className="flex items-center gap-2 mt-1">
               <p className="text-sm text-muted-foreground">≈ {mockUsdcBalance.toFixed(2)} USDC + {mockBtcBalance.toFixed(8)} BTC</p>
@@ -94,12 +94,12 @@ const Wallet: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Account Performance Chart */}
+        {/* Portfolio History Balance Chart */}
         <Card className="mb-4 md:mb-6">
           <CardHeader className="pb-2 md:pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <CardTitle className="text-base md:text-lg">Account Performance</CardTitle>
+                <CardTitle className="text-base md:text-lg">Portfolio History Balance</CardTitle>
                 <p className="text-2xl md:text-3xl font-bold mt-1 md:mt-2">${totalBalance.toFixed(2)}</p>
                 <div className="flex items-center gap-2 mt-1">
                   {performance.isZero ? (
