@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +23,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { useUserBankAccounts, useCreateCashoutOrder, useRemoveBankAccount } from "@/hooks/useTreasury";
+import { usePlaidLink } from "@/hooks/usePlaidLink";
 
 interface CashOutModalProps {
   open: boolean;
@@ -47,12 +47,15 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   const [sourceAsset, setSourceAsset] = useState<SourceAsset>("USDC");
   const [amount, setAmount] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [isLinkingBank, setIsLinkingBank] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
 
   const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts();
   const createCashout = useCreateCashoutOrder();
   const removeAccount = useRemoveBankAccount();
+  
+  // Plaid Link integration
+  const { openPlaidLink, isLoading: isLinkingBank, error: linkError } = usePlaidLink(() => {
+    refetchAccounts();
+  });
 
   // Auto-select primary account
   useEffect(() => {
@@ -72,69 +75,13 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   const maxBalance = sourceAsset === "USDC" ? usdcBalance : btcBalance * currentBtcPrice;
   const insufficientBalance = usdAmount > maxBalance;
 
-  const handleConnectBank = useCallback(async () => {
+  const handleConnectBank = () => {
     if (!user) {
       toast.error("Please sign in first");
       return;
     }
-
-    setIsLinkingBank(true);
-    setLinkError(null);
-
-    try {
-      // Get link token from edge function
-      const { data: session } = await supabase.auth.getSession();
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-link`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.session?.access_token}`,
-          },
-          body: JSON.stringify({ action: "create_link_token" }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || data.mock) {
-        // Plaid not configured - offer demo mode
-        const mockConfirm = window.confirm(
-          "Bank linking is not configured yet. Would you like to add a demo bank account for testing?"
-        );
-        
-        if (mockConfirm) {
-          // Insert mock bank account
-          const { error } = await supabase.from("user_bank_accounts").insert({
-            user_id: user.id,
-            bank_name: "Demo Bank",
-            account_mask: "1234",
-            account_type: "checking",
-            is_verified: true,
-            is_primary: !bankAccounts || bankAccounts.length === 0,
-          });
-
-          if (error) throw error;
-          
-          await refetchAccounts();
-          toast.success("Demo bank account added for testing");
-        }
-      } else if (data.link_token) {
-        // TODO: Integrate with Plaid Link SDK
-        // For now, show instructions
-        toast.info(
-          "Plaid Link integration requires the Plaid Link SDK. Contact support to complete setup."
-        );
-      }
-    } catch (error: any) {
-      console.error("Bank linking error:", error);
-      setLinkError(error.message || "Failed to connect bank");
-      toast.error("Failed to connect bank account");
-    } finally {
-      setIsLinkingBank(false);
-    }
-  }, [user, bankAccounts, refetchAccounts]);
+    openPlaidLink();
+  };
 
   const handleRemoveAccount = async (accountId: string) => {
     if (confirm("Remove this bank account?")) {
