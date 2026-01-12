@@ -10,7 +10,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
 import { BuySellBtcModal } from "@/components/wallet/BuySellBtcModal";
-import { SellUsdcModal } from "@/components/wallet/SellUsdcModal";
+import { UsdcActionsModal } from "@/components/wallet/UsdcActionsModal";
 import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
 
 // Mock price data
@@ -36,7 +36,7 @@ const Wallet: React.FC = () => {
   const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [buySellModalOpen, setBuySellModalOpen] = useState(false);
-  const [sellUsdcModalOpen, setSellUsdcModalOpen] = useState(false);
+  const [usdcActionsModalOpen, setUsdcActionsModalOpen] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     // Simulate refresh delay
@@ -199,7 +199,7 @@ const Wallet: React.FC = () => {
 
           <Card 
             className={isKycApproved ? "cursor-pointer transition-all hover:border-usdc/50 hover:shadow-md" : ""}
-            onClick={() => isKycApproved && setSellUsdcModalOpen(true)}
+            onClick={() => isKycApproved && setUsdcActionsModalOpen(true)}
           >
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
@@ -211,7 +211,7 @@ const Wallet: React.FC = () => {
                   <p className="text-sm text-muted-foreground">USDC</p>
                 </div>
                 {isKycApproved && (
-                  <span className="text-xs text-muted-foreground">Tap to withdraw</span>
+                  <span className="text-xs text-muted-foreground">Tap to manage</span>
                 )}
               </div>
             </CardHeader>
@@ -282,10 +282,10 @@ const Wallet: React.FC = () => {
           usdcBalance={mockUsdcBalance}
         />
 
-        {/* Sell USDC Modal */}
-        <SellUsdcModal
-          open={sellUsdcModalOpen}
-          onOpenChange={setSellUsdcModalOpen}
+        {/* USDC Actions Modal */}
+        <UsdcActionsModal
+          open={usdcActionsModalOpen}
+          onOpenChange={setUsdcActionsModalOpen}
           usdcBalance={mockUsdcBalance}
         />
       </div>
