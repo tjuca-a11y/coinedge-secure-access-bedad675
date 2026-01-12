@@ -1472,6 +1472,39 @@ export type Database = {
           },
         ]
       }
+      treasury_snapshots: {
+        Row: {
+          btc_eligible: number
+          btc_total: number
+          company_usdc: number
+          created_at: string
+          id: string
+          snapshot_date: string
+          usdc_available: number
+          usdc_total: number
+        }
+        Insert: {
+          btc_eligible?: number
+          btc_total?: number
+          company_usdc?: number
+          created_at?: string
+          id?: string
+          snapshot_date: string
+          usdc_available?: number
+          usdc_total?: number
+        }
+        Update: {
+          btc_eligible?: number
+          btc_total?: number
+          company_usdc?: number
+          created_at?: string
+          id?: string
+          snapshot_date?: string
+          usdc_available?: number
+          usdc_total?: number
+        }
+        Relationships: []
+      }
       treasury_wallet: {
         Row: {
           asset_type: string | null
