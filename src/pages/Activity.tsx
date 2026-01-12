@@ -19,7 +19,11 @@ import {
   AlertCircle,
   Check,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  X,
+  Copy,
+  ExternalLink,
+  ShoppingCart
 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
@@ -34,6 +38,12 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Mock BTC price data
 const btcPriceData = [
@@ -45,26 +55,109 @@ const btcPriceData = [
 
 // Mock current values
 const currentBtcPrice = 93327.91;
-const mockCashBalance = 6847.32;
 const mockUsdcBalance = 2450.00;
 const mockBtcBalance = 0.464;
 const mockBtcValue = mockBtcBalance * currentBtcPrice;
 
-// Mock transaction data grouped by month
-const mockTransactions = [
+interface Transaction {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  amount: string;
+  amountColor: string;
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+  type: "buy_btc" | "sell_btc" | "buy_usdc" | "sell_usdc" | "received" | "sent" | "loan" | "interest" | "gift";
+  status: "completed" | "pending" | "failed";
+  txHash?: string;
+  fee?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  usdValue?: string;
+}
+
+// Mock transaction data with more variety
+const mockTransactions: Transaction[] = [
   {
     id: "1",
+    title: "Bought Bitcoin",
+    description: "Purchased 0.025 BTC with USDC",
+    date: "Today at 2:45 PM",
+    amount: "+0.025 BTC",
+    amountColor: "text-success",
+    icon: ShoppingCart,
+    iconBg: "bg-green-100",
+    iconColor: "text-green-600",
+    type: "buy_btc",
+    status: "completed",
+    txHash: "0x1a2b3c4d5e6f...",
+    fee: "$2.50",
+    usdValue: "$2,333.20",
+  },
+  {
+    id: "2",
+    title: "Sold Bitcoin",
+    description: "Sold 0.01 BTC for USDC",
+    date: "Yesterday at 11:30 AM",
+    amount: "-0.01 BTC",
+    amountColor: "text-foreground",
+    icon: ArrowUpRight,
+    iconBg: "bg-orange-100",
+    iconColor: "text-orange-600",
+    type: "sell_btc",
+    status: "completed",
+    txHash: "0x2b3c4d5e6f7a...",
+    fee: "$1.25",
+    usdValue: "$933.28",
+  },
+  {
+    id: "3",
+    title: "Bought USDC",
+    description: "Purchased $500 USDC",
+    date: "Jan 10 at 3:15 PM",
+    amount: "+$500.00",
+    amountColor: "text-success",
+    icon: ShoppingCart,
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+    type: "buy_usdc",
+    status: "completed",
+    fee: "$0.50",
+    usdValue: "$500.00",
+  },
+  {
+    id: "4",
+    title: "Sold USDC",
+    description: "Withdrew $200 to bank",
+    date: "Jan 8 at 10:00 AM",
+    amount: "-$200.00",
+    amountColor: "text-foreground",
+    icon: ArrowUpRight,
+    iconBg: "bg-purple-100",
+    iconColor: "text-purple-600",
+    type: "sell_usdc",
+    status: "completed",
+    fee: "$1.00",
+    usdValue: "$200.00",
+  },
+  {
+    id: "5",
     title: "BTC Gift Card Redeemed",
     description: "0.0005 BTC added to wallet",
-    date: "Today at 2:45 PM",
+    date: "Jan 5 at 2:45 PM",
     amount: "+0.0005 BTC",
     amountColor: "text-success",
     icon: Gift,
     iconBg: "bg-amber-100",
     iconColor: "text-amber-600",
+    type: "gift",
+    status: "completed",
+    usdValue: "$46.66",
   },
   {
-    id: "2",
+    id: "6",
     title: "Loan Initiated",
     description: "Bitcoin-backed loan · 0.5 BTC collateral",
     date: "Nov 15 at 10:30 AM",
@@ -73,9 +166,12 @@ const mockTransactions = [
     icon: Wallet,
     iconBg: "bg-blue-100",
     iconColor: "text-blue-600",
+    type: "loan",
+    status: "completed",
+    usdValue: "$20,000",
   },
   {
-    id: "3",
+    id: "7",
     title: "BTC Transfer Completed",
     description: "Sent to external wallet",
     date: "Nov 12 at 4:15 PM",
@@ -84,20 +180,31 @@ const mockTransactions = [
     icon: ArrowUpRight,
     iconBg: "bg-orange-100",
     iconColor: "text-orange-600",
+    type: "sent",
+    status: "completed",
+    txHash: "0x3c4d5e6f7a8b...",
+    fee: "$1.50",
+    toAddress: "bc1q...xyz",
+    usdValue: "$1,399.92",
   },
   {
-    id: "4",
+    id: "8",
     title: "Collateral Deposited",
     description: "Secured via Fireblocks",
     date: "Nov 10 at 9:22 AM",
     amount: "+0.5 BTC",
     amountColor: "text-success",
     icon: ArrowDownLeft,
-    iconBg: "bg-red-100",
-    iconColor: "text-red-600",
+    iconBg: "bg-green-100",
+    iconColor: "text-green-600",
+    type: "received",
+    status: "completed",
+    txHash: "0x4d5e6f7a8b9c...",
+    fromAddress: "bc1q...abc",
+    usdValue: "$46,663.96",
   },
   {
-    id: "5",
+    id: "9",
     title: "Interest Payment Processed",
     description: "Monthly loan interest deducted",
     date: "Nov 5 at 12:00 PM",
@@ -106,10 +213,13 @@ const mockTransactions = [
     icon: DollarSign,
     iconBg: "bg-purple-100",
     iconColor: "text-purple-600",
+    type: "interest",
+    status: "completed",
+    usdValue: "$83.33",
   },
 ];
 
-type TransactionType = "all" | "received" | "sent" | "loans" | "interest";
+type TransactionType = "all" | "received" | "sent" | "loans" | "interest" | "buy_btc" | "sell_btc" | "buy_usdc" | "sell_usdc";
 type SortOption = "newest" | "oldest" | "highest" | "lowest";
 
 const Activity: React.FC = () => {
@@ -118,6 +228,8 @@ const Activity: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [typeFilter, setTypeFilter] = useState<TransactionType>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -136,20 +248,22 @@ const Activity: React.FC = () => {
       tx.description.toLowerCase().includes(searchQuery.toLowerCase());
     
     if (typeFilter === "all") return matchesSearch;
-    if (typeFilter === "received") return matchesSearch && tx.amount.startsWith("+");
-    if (typeFilter === "sent") return matchesSearch && tx.amount.startsWith("-") && !tx.title.includes("Interest");
-    if (typeFilter === "loans") return matchesSearch && tx.title.includes("Loan");
-    if (typeFilter === "interest") return matchesSearch && tx.title.includes("Interest");
+    if (typeFilter === "received") return matchesSearch && (tx.type === "received" || tx.type === "gift");
+    if (typeFilter === "sent") return matchesSearch && tx.type === "sent";
+    if (typeFilter === "loans") return matchesSearch && tx.type === "loan";
+    if (typeFilter === "interest") return matchesSearch && tx.type === "interest";
+    if (typeFilter === "buy_btc") return matchesSearch && tx.type === "buy_btc";
+    if (typeFilter === "sell_btc") return matchesSearch && tx.type === "sell_btc";
+    if (typeFilter === "buy_usdc") return matchesSearch && tx.type === "buy_usdc";
+    if (typeFilter === "sell_usdc") return matchesSearch && tx.type === "sell_usdc";
     return matchesSearch;
   });
 
   // Sort transactions
   const sortedTransactions = [...filteredTransactions].sort((a, b) => {
     if (sortBy === "newest" || sortBy === "oldest") {
-      // For demo, we'll just reverse the array for oldest
       return sortBy === "oldest" ? 1 : -1;
     }
-    // Parse amounts for sorting by value
     const parseAmount = (amt: string) => {
       const num = parseFloat(amt.replace(/[^0-9.-]/g, ""));
       return isNaN(num) ? 0 : Math.abs(num);
@@ -161,7 +275,18 @@ const Activity: React.FC = () => {
 
   const handleDownload = (format: "csv" | "pdf") => {
     toast.success(`Downloading transactions as ${format.toUpperCase()}...`);
-    // In a real app, this would trigger an actual download
+  };
+
+  const handleTransactionClick = (tx: Transaction) => {
+    setSelectedTransaction(tx);
+    setIsReceiptOpen(true);
+  };
+
+  const handleCopyTxHash = () => {
+    if (selectedTransaction?.txHash) {
+      navigator.clipboard.writeText(selectedTransaction.txHash);
+      toast.success("Transaction hash copied");
+    }
   };
 
   const getFilterLabel = () => {
@@ -170,6 +295,10 @@ const Activity: React.FC = () => {
       case "sent": return "Sent";
       case "loans": return "Loans";
       case "interest": return "Interest";
+      case "buy_btc": return "Buy BTC";
+      case "sell_btc": return "Sell BTC";
+      case "buy_usdc": return "Buy USDC";
+      case "sell_usdc": return "Sell USDC";
       default: return "Filter";
     }
   };
@@ -183,6 +312,32 @@ const Activity: React.FC = () => {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-success/10 text-success text-xs font-medium">
+            <Check className="h-3 w-3" />
+            Completed
+          </span>
+        );
+      case "pending":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+            Pending
+          </span>
+        );
+      case "failed":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/10 text-destructive text-xs font-medium">
+            Failed
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <DashboardLayout title="Activity" subtitle="View your transaction history">
       <div ref={containerRef}>
@@ -191,18 +346,8 @@ const Activity: React.FC = () => {
           isRefreshing={isRefreshing} 
         />
 
-        {/* Balance Cards */}
-        <div className="grid grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6">
-          <Card>
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center gap-1 text-muted-foreground text-xs md:text-sm mb-1">
-                <DollarSign className="h-3 w-3" />
-                Cash
-              </div>
-              <p className="text-lg md:text-2xl font-bold">${mockCashBalance.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Available</p>
-            </CardContent>
-          </Card>
+        {/* Balance Cards - USDC and Bitcoin only */}
+        <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4 md:mb-6">
           <Card>
             <CardContent className="p-3 md:p-4">
               <div className="flex items-center gap-1 text-muted-foreground text-xs md:text-sm mb-1">
@@ -330,6 +475,36 @@ const Activity: React.FC = () => {
                 >
                   All transactions
                 </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Bitcoin</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "buy_btc"}
+                  onCheckedChange={() => setTypeFilter("buy_btc")}
+                >
+                  Buy BTC
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "sell_btc"}
+                  onCheckedChange={() => setTypeFilter("sell_btc")}
+                >
+                  Sell BTC
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">USDC</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "buy_usdc"}
+                  onCheckedChange={() => setTypeFilter("buy_usdc")}
+                >
+                  Buy USDC
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "sell_usdc"}
+                  onCheckedChange={() => setTypeFilter("sell_usdc")}
+                >
+                  Sell USDC
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Other</DropdownMenuLabel>
                 <DropdownMenuCheckboxItem 
                   checked={typeFilter === "received"}
                   onCheckedChange={() => setTypeFilter("received")}
@@ -431,7 +606,7 @@ const Activity: React.FC = () => {
         </div>
 
         {/* Month Header */}
-        <p className="text-sm font-semibold mb-3 px-1">November 2025</p>
+        <p className="text-sm font-semibold mb-3 px-1">January 2026</p>
 
         {/* Transaction List */}
         <div className="space-y-1">
@@ -451,7 +626,11 @@ const Activity: React.FC = () => {
             sortedTransactions.map((tx) => {
               const IconComponent = tx.icon;
               return (
-                <Card key={tx.id} className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <Card 
+                  key={tx.id} 
+                  className="hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => handleTransactionClick(tx)}
+                >
                   <CardContent className="p-3 md:p-4 flex items-center gap-3">
                     <div className={`p-2 rounded-full ${tx.iconBg}`}>
                       <IconComponent className={`h-4 w-4 ${tx.iconColor}`} />
@@ -471,6 +650,99 @@ const Activity: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Transaction Receipt Modal */}
+      <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Transaction Receipt
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedTransaction && (
+            <div className="space-y-4">
+              {/* Transaction Icon and Title */}
+              <div className="flex flex-col items-center text-center py-4">
+                <div className={`p-4 rounded-full ${selectedTransaction.iconBg} mb-3`}>
+                  <selectedTransaction.icon className={`h-8 w-8 ${selectedTransaction.iconColor}`} />
+                </div>
+                <h3 className="text-xl font-semibold">{selectedTransaction.title}</h3>
+                <p className="text-muted-foreground text-sm">{selectedTransaction.description}</p>
+                <div className="mt-2">
+                  {getStatusBadge(selectedTransaction.status)}
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div className="text-center py-4 border-y">
+                <p className={`text-3xl font-bold ${selectedTransaction.amountColor}`}>
+                  {selectedTransaction.amount}
+                </p>
+                {selectedTransaction.usdValue && (
+                  <p className="text-muted-foreground text-sm mt-1">
+                    ≈ {selectedTransaction.usdValue}
+                  </p>
+                )}
+              </div>
+
+              {/* Transaction Details */}
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-medium">{selectedTransaction.date}</span>
+                </div>
+                
+                {selectedTransaction.fee && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Network Fee</span>
+                    <span className="font-medium">{selectedTransaction.fee}</span>
+                  </div>
+                )}
+
+                {selectedTransaction.fromAddress && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">From</span>
+                    <span className="font-medium font-mono text-xs">{selectedTransaction.fromAddress}</span>
+                  </div>
+                )}
+
+                {selectedTransaction.toAddress && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">To</span>
+                    <span className="font-medium font-mono text-xs">{selectedTransaction.toAddress}</span>
+                  </div>
+                )}
+
+                {selectedTransaction.txHash && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Transaction ID</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium font-mono text-xs">{selectedTransaction.txHash}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTxHash}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4">
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => setIsReceiptOpen(false)}>
+                  Close
+                </Button>
+                {selectedTransaction.txHash && (
+                  <Button variant="default" className="flex-1 gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    View on Explorer
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
