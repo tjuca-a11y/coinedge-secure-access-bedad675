@@ -38,7 +38,7 @@ const recentContacts: Contact[] = [
   { id: "4", name: "Emma Wilson", address: "0x1234...5678", initials: "EW", color: "bg-orange-500" },
 ];
 
-const PayRequest: React.FC = () => {
+const SendRequest: React.FC = () => {
   const { isKycApproved } = useAuth();
   const [amount, setAmount] = useState("0");
   const [currency, setCurrency] = useState("USDC");
@@ -757,4 +757,4 @@ const PayRequest: React.FC = () => {
   );
 };
 
-export default PayRequest;
+export default SendRequest;
