@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -14,11 +14,30 @@ export interface KycFormData {
   phone: string;
 }
 
+interface PlaidIdentityResponse {
+  success: boolean;
+  link_token?: string;
+  identity_verification_id?: string;
+  error?: string;
+  mock?: boolean;
+  message?: string;
+}
+
+interface PlaidVerificationResultResponse {
+  success: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string | null;
+  error?: string;
+}
+
 export const useKyc = () => {
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [identityVerificationId, setIdentityVerificationId] = useState<string | null>(null);
 
+  // Submit personal info to prefill Plaid Identity
   const submitPersonalInfo = async (data: KycFormData) => {
     if (!user) {
       setError('User not authenticated');
@@ -56,6 +75,109 @@ export const useKyc = () => {
     }
   };
 
+  // Create Plaid Identity verification link token
+  const createIdentityVerificationToken = useCallback(async (): Promise<boolean> => {
+    if (!user) {
+      setError('User not authenticated');
+      return false;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-identity`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.session?.access_token}`,
+          },
+          body: JSON.stringify({ action: 'create_identity_token' }),
+        }
+      );
+
+      const data: PlaidIdentityResponse = await response.json();
+
+      if (data.mock) {
+        // Plaid not configured - show demo mode message
+        setError(data.message || 'Plaid is not configured. Running in demo mode.');
+        return false;
+      }
+
+      if (data.success && data.link_token) {
+        setPlaidLinkToken(data.link_token);
+        if (data.identity_verification_id) {
+          setIdentityVerificationId(data.identity_verification_id);
+        }
+        return true;
+      }
+
+      setError(data.error || 'Failed to create verification session');
+      return false;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start identity verification');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Handle verification completion from Plaid
+  const handleVerificationComplete = useCallback(async (
+    verificationId: string
+  ): Promise<PlaidVerificationResultResponse> => {
+    if (!user) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-identity`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'handle_verification_result',
+            identity_verification_id: verificationId,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        await refreshProfile();
+        return {
+          success: true,
+          status: data.status,
+          rejection_reason: data.rejection_reason,
+        };
+      }
+
+      setError(data.error || 'Failed to process verification');
+      return { success: false, error: data.error };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process verification';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [user, refreshProfile]);
+
+  // Submit KYC for manual review (fallback when Plaid not configured)
   const submitKycForReview = async () => {
     if (!user) {
       setError('User not authenticated');
@@ -124,11 +246,22 @@ export const useKyc = () => {
     }
   };
 
+  // Clear Plaid tokens
+  const clearPlaidTokens = useCallback(() => {
+    setPlaidLinkToken(null);
+    setIdentityVerificationId(null);
+  }, []);
+
   return {
     loading,
     error,
+    plaidLinkToken,
+    identityVerificationId,
     submitPersonalInfo,
+    createIdentityVerificationToken,
+    handleVerificationComplete,
     submitKycForReview,
     simulateKycApproval,
+    clearPlaidTokens,
   };
 };
