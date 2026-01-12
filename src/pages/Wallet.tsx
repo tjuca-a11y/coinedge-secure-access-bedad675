@@ -77,7 +77,7 @@ const Wallet: React.FC = () => {
 
   return (
     <DashboardLayout title="Wallet" subtitle="Manage your Bitcoin and USDC balances">
-      <div ref={containerRef} className="h-full overflow-auto -m-3 md:-m-6 p-3 md:p-6">
+      <div ref={containerRef}>
         <PullToRefreshIndicator 
           pullDistance={pullDistance} 
           isRefreshing={isRefreshing} 
