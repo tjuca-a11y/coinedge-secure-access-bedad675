@@ -4,7 +4,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Send, Download, Gift, ArrowUpRight, Bitcoin, DollarSign, Copy, ExternalLink } from "lucide-react";
+import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -13,15 +13,15 @@ import { BuySellBtcModal } from "@/components/wallet/BuySellBtcModal";
 import { UsdcActionsModal } from "@/components/wallet/UsdcActionsModal";
 import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
 
-// Mock price data
-const priceData = [
-  { date: "Jan 4", btc: 91000 },
-  { date: "Jan 5", btc: 92500 },
-  { date: "Jan 6", btc: 90800 },
-  { date: "Jan 7", btc: 93200 },
-  { date: "Jan 8", btc: 92100 },
-  { date: "Jan 9", btc: 94500 },
-  { date: "Jan 10", btc: 93327 },
+// Mock account performance data
+const accountPerformanceData = [
+  { date: "Jan 4", value: 0 },
+  { date: "Jan 5", value: 0 },
+  { date: "Jan 6", value: 0 },
+  { date: "Jan 7", value: 0 },
+  { date: "Jan 8", value: 0 },
+  { date: "Jan 9", value: 0 },
+  { date: "Jan 10", value: 0 },
 ];
 
 // Mock current BTC price
@@ -73,23 +73,22 @@ const Wallet: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Bitcoin Price Chart */}
+        {/* Account Performance Chart */}
         <Card className="mb-4 md:mb-6">
           <CardHeader className="pb-2 md:pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <CardTitle className="text-base md:text-lg">Bitcoin Price</CardTitle>
-                <p className="text-2xl md:text-3xl font-bold mt-1 md:mt-2">$93,327.91</p>
-                <p className="text-xs md:text-sm text-success flex items-center gap-1">
-                  <ArrowUpRight className="h-3 w-3 md:h-4 md:w-4" />
-                  +2.05% today
+                <CardTitle className="text-base md:text-lg">Account Performance</CardTitle>
+                <p className="text-2xl md:text-3xl font-bold mt-1 md:mt-2">${((mockBtcBalance * currentBtcPrice) + mockUsdcBalance).toFixed(2)}</p>
+                <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1">
+                  All time
                 </p>
               </div>
               <div className="flex gap-1 md:gap-2 overflow-x-auto pb-1">
                 {["1D", "1W", "1M", "1Y", "All"].map((period) => (
                   <Button
                     key={period}
-                    variant={period === "1W" ? "default" : "outline"}
+                    variant={period === "All" ? "default" : "outline"}
                     size="sm"
                     className="h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm shrink-0"
                   >
@@ -102,11 +101,11 @@ const Wallet: React.FC = () => {
           <CardContent className="pt-0 md:pt-2">
             <div className="h-[150px] md:h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={priceData}>
+                <LineChart data={accountPerformanceData}>
                   <XAxis dataKey="date" axisLine={false} tickLine={false} />
-                  <YAxis hide domain={["dataMin - 1000", "dataMax + 1000"]} />
+                  <YAxis hide domain={[0, "auto"]} />
                   <Tooltip 
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, "BTC"]}
+                    formatter={(value: number) => [`$${value.toLocaleString()}`, "Balance"]}
                     contentStyle={{ 
                       backgroundColor: "hsl(var(--card))", 
                       border: "1px solid hsl(var(--border))",
@@ -115,7 +114,7 @@ const Wallet: React.FC = () => {
                   />
                   <Line 
                     type="monotone" 
-                    dataKey="btc" 
+                    dataKey="value" 
                     stroke="hsl(var(--primary))" 
                     strokeWidth={2}
                     dot={false}
