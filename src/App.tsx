@@ -16,7 +16,7 @@ import SignUp from "./pages/SignUp";
 import Kyc from "./pages/Kyc";
 import Activity from "./pages/Activity";
 import Wallet from "./pages/Wallet";
-import PayRequest from "./pages/PayRequest";
+import SendRequest from "./pages/SendRequest";
 import Settings from "./pages/Settings";
 import IdentityVerification from "./pages/IdentityVerification";
 import Redeem from "./pages/Redeem";
@@ -136,7 +136,7 @@ const App = () => (
                 <Route path="/" element={<ProtectedRoute><Navigate to="/activity" replace /></ProtectedRoute>} />
                 <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
                 <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-                <Route path="/send" element={<ProtectedRoute><PayRequest /></ProtectedRoute>} />
+                <Route path="/send" element={<ProtectedRoute><SendRequest /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/settings/identity-verification" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
                 <Route path="/redeem" element={<ProtectedRoute><Redeem /></ProtectedRoute>} />
