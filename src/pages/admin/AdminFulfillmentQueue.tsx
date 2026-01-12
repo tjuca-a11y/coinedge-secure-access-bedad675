@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -26,6 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Pause,
   Play,
@@ -36,14 +38,22 @@ import {
   XCircle,
   AlertTriangle,
   Filter,
+  Zap,
+  RefreshCw,
+  TrendingUp,
 } from 'lucide-react';
 import {
   useFulfillmentOrders,
   useUpdateFulfillmentOrder,
+  useInventoryStats,
+  useSystemSettings,
+  useUpdateSystemSetting,
   FulfillmentOrder,
 } from '@/hooks/useBtcInventory';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-US', {
@@ -72,11 +82,55 @@ const AdminFulfillmentQueue: React.FC = () => {
   const { isSuperAdmin } = useAdminAuth();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const { data: orders, isLoading } = useFulfillmentOrders(
+  const { data: orders, isLoading, refetch } = useFulfillmentOrders(
     statusFilter !== 'all' ? { status: statusFilter } : undefined
   );
+  const { data: stats } = useInventoryStats();
+  const { data: settings } = useSystemSettings();
+  const updateSetting = useUpdateSystemSetting();
   const updateOrder = useUpdateFulfillmentOrder();
+
+  const btcPayoutsPaused = settings?.find(s => s.setting_key === 'BTC_PAYOUTS_PAUSED')?.setting_value === 'true';
+
+  const handleTogglePayouts = async () => {
+    await updateSetting.mutateAsync({
+      key: 'BTC_PAYOUTS_PAUSED',
+      value: btcPayoutsPaused ? 'false' : 'true'
+    });
+  };
+
+  const handleProcessQueue = async () => {
+    setIsProcessing(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-fulfillment-queue`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.session?.access_token}`,
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        toast.success(`Processed ${result.processed} orders, allocated ${result.allocated}`);
+        refetch();
+      } else {
+        toast.error(result.message || 'Failed to process queue');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to process queue');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleHold = async (order: FulfillmentOrder, reason: string = 'Admin hold') => {
     await updateOrder.mutateAsync({
@@ -118,8 +172,79 @@ const AdminFulfillmentQueue: React.FC = () => {
     );
   });
 
+  // Count orders by status
+  const pendingCount = orders?.filter(o => ['SUBMITTED', 'WAITING_INVENTORY', 'KYC_PENDING'].includes(o.status)).length || 0;
+  const readyCount = orders?.filter(o => o.status === 'READY_TO_SEND').length || 0;
+
   return (
     <AdminLayout title="Fulfillment Queue" subtitle="Manage pending BTC fulfillment orders">
+      {/* Auto-Processing Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Eligible BTC</p>
+                <p className="text-2xl font-bold">₿ {stats?.eligible_btc?.toFixed(4) || '0.0000'}</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-btc opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Pending Orders</p>
+                <p className="text-2xl font-bold">{pendingCount}</p>
+              </div>
+              <Clock className="h-8 w-8 text-muted-foreground opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Ready to Send</p>
+                <p className="text-2xl font-bold">{readyCount}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-success opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/50">
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="payouts-toggle" className="text-sm">
+                BTC Payouts
+              </Label>
+              <Switch
+                id="payouts-toggle"
+                checked={!btcPayoutsPaused}
+                onCheckedChange={handleTogglePayouts}
+                disabled={updateSetting.isPending}
+              />
+            </div>
+            <Button
+              onClick={handleProcessQueue}
+              disabled={isProcessing || btcPayoutsPaused}
+              className="w-full gap-2"
+              size="sm"
+            >
+              {isProcessing ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              Process Queue
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <CardTitle>Pending Orders</CardTitle>

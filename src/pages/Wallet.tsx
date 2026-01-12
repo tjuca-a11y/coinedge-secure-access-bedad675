@@ -4,7 +4,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink, TrendingUp, TrendingDown, Minus, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -12,6 +12,8 @@ import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
 import { BuySellBtcModal } from "@/components/wallet/BuySellBtcModal";
 import { UsdcActionsModal } from "@/components/wallet/UsdcActionsModal";
 import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
+import { CashOutModal } from "@/components/wallet/CashOutModal";
+import { CashOutHistory } from "@/components/wallet/CashOutHistory";
 
 // Mock account performance data with more realistic values for demo
 const accountPerformanceData = [
@@ -52,6 +54,7 @@ const Wallet: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [buySellModalOpen, setBuySellModalOpen] = useState(false);
   const [usdcActionsModalOpen, setUsdcActionsModalOpen] = useState(false);
+  const [cashOutModalOpen, setCashOutModalOpen] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     // Simulate refresh delay
@@ -184,6 +187,15 @@ const Wallet: React.FC = () => {
             <Gift className="h-4 w-4" />
             Redeem
           </Button>
+          <Button 
+            variant="secondary"
+            disabled={!isKycApproved} 
+            className="gap-2 flex-1 sm:flex-none text-sm"
+            onClick={() => setCashOutModalOpen(true)}
+          >
+            <Building2 className="h-4 w-4" />
+            Cash Out
+          </Button>
         </div>
 
         {/* Balance Cards */}
@@ -289,8 +301,9 @@ const Wallet: React.FC = () => {
 
         {/* Order History */}
         {isKycApproved && (
-          <div className="mb-4 md:mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 md:mb-6">
             <SwapOrderHistory />
+            <CashOutHistory />
           </div>
         )}
 
@@ -327,6 +340,15 @@ const Wallet: React.FC = () => {
           open={usdcActionsModalOpen}
           onOpenChange={setUsdcActionsModalOpen}
           usdcBalance={mockUsdcBalance}
+        />
+
+        {/* Cash Out Modal */}
+        <CashOutModal
+          open={cashOutModalOpen}
+          onOpenChange={setCashOutModalOpen}
+          btcBalance={mockBtcBalance}
+          usdcBalance={mockUsdcBalance}
+          currentBtcPrice={currentBtcPrice}
         />
       </div>
     </DashboardLayout>
