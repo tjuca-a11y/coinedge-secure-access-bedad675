@@ -423,6 +423,60 @@ export type Database = {
           },
         ]
       }
+      customer_swap_orders: {
+        Row: {
+          btc_amount: number
+          btc_price_at_order: number
+          completed_at: string | null
+          created_at: string
+          customer_id: string
+          destination_address: string | null
+          failed_reason: string | null
+          fee_usdc: number
+          id: string
+          order_id: string
+          order_type: Database["public"]["Enums"]["swap_order_type"]
+          status: Database["public"]["Enums"]["swap_order_status"]
+          tx_hash: string | null
+          updated_at: string
+          usdc_amount: number
+        }
+        Insert: {
+          btc_amount: number
+          btc_price_at_order: number
+          completed_at?: string | null
+          created_at?: string
+          customer_id: string
+          destination_address?: string | null
+          failed_reason?: string | null
+          fee_usdc?: number
+          id?: string
+          order_id?: string
+          order_type: Database["public"]["Enums"]["swap_order_type"]
+          status?: Database["public"]["Enums"]["swap_order_status"]
+          tx_hash?: string | null
+          updated_at?: string
+          usdc_amount: number
+        }
+        Update: {
+          btc_amount?: number
+          btc_price_at_order?: number
+          completed_at?: string | null
+          created_at?: string
+          customer_id?: string
+          destination_address?: string | null
+          failed_reason?: string | null
+          fee_usdc?: number
+          id?: string
+          order_id?: string
+          order_type?: Database["public"]["Enums"]["swap_order_type"]
+          status?: Database["public"]["Enums"]["swap_order_status"]
+          tx_hash?: string | null
+          updated_at?: string
+          usdc_amount?: number
+        }
+        Relationships: []
+      }
       daily_btc_sends: {
         Row: {
           created_at: string
@@ -1318,6 +1372,13 @@ export type Database = {
       merchant_user_status: "ACTIVE" | "DISABLED"
       rep_status: "draft" | "cleared" | "active" | "disabled"
       square_payment_status: "CREATED" | "PAID" | "FAILED" | "CANCELED"
+      swap_order_status:
+        | "PENDING"
+        | "PROCESSING"
+        | "COMPLETED"
+        | "FAILED"
+        | "CANCELLED"
+      swap_order_type: "BUY_BTC" | "SELL_BTC"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1494,6 +1555,14 @@ export const Constants = {
       merchant_user_status: ["ACTIVE", "DISABLED"],
       rep_status: ["draft", "cleared", "active", "disabled"],
       square_payment_status: ["CREATED", "PAID", "FAILED", "CANCELED"],
+      swap_order_status: [
+        "PENDING",
+        "PROCESSING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+      ],
+      swap_order_type: ["BUY_BTC", "SELL_BTC"],
     },
   },
 } as const

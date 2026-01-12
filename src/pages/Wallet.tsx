@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
+import { BuySellBtcModal } from "@/components/wallet/BuySellBtcModal";
 
 // Mock price data
 const priceData = [
@@ -21,10 +22,18 @@ const priceData = [
   { date: "Jan 10", btc: 93327 },
 ];
 
+// Mock current BTC price
+const currentBtcPrice = 93327.91;
+
+// Mock balances (in real app, fetch from backend)
+const mockBtcBalance = 0;
+const mockUsdcBalance = 0;
+
 const Wallet: React.FC = () => {
   const { profile, isKycApproved } = useAuth();
   const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState(Date.now());
+  const [buySellModalOpen, setBuySellModalOpen] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     // Simulate refresh delay
@@ -56,8 +65,8 @@ const Wallet: React.FC = () => {
         <Card className="mb-4 md:mb-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
           <CardContent className="py-6">
             <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
-            <p className="text-3xl md:text-4xl font-bold">$0.00</p>
-            <p className="text-sm text-muted-foreground mt-1">≈ 0.00 USDC</p>
+            <p className="text-3xl md:text-4xl font-bold">${((mockBtcBalance * currentBtcPrice) + mockUsdcBalance).toFixed(2)}</p>
+            <p className="text-sm text-muted-foreground mt-1">≈ {mockUsdcBalance.toFixed(2)} USDC + {mockBtcBalance.toFixed(8)} BTC</p>
           </CardContent>
         </Card>
 
@@ -136,25 +145,31 @@ const Wallet: React.FC = () => {
 
         {/* Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
-          <Card>
+          <Card 
+            className={isKycApproved ? "cursor-pointer transition-all hover:border-btc/50 hover:shadow-md" : ""}
+            onClick={() => isKycApproved && setBuySellModalOpen(true)}
+          >
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-btc/10 rounded-full">
                   <Bitcoin className="h-6 w-6 text-btc" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <CardTitle className="text-lg">Bitcoin</CardTitle>
                   <p className="text-sm text-muted-foreground">BTC</p>
                 </div>
+                {isKycApproved && (
+                  <span className="text-xs text-muted-foreground">Tap to trade</span>
+                )}
               </div>
             </CardHeader>
             <CardContent>
               {isKycApproved ? (
                 <>
-                  <p className="text-2xl md:text-3xl font-bold mb-1">0.00000000 BTC</p>
-                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ $0.00</p>
+                  <p className="text-2xl md:text-3xl font-bold mb-1">{mockBtcBalance.toFixed(8)} BTC</p>
+                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${(mockBtcBalance * currentBtcPrice).toFixed(2)}</p>
                   {profile?.btc_address && (
-                    <div className="p-3 bg-muted rounded-lg">
+                    <div className="p-3 bg-muted rounded-lg" onClick={(e) => e.stopPropagation()}>
                       <p className="text-xs text-muted-foreground mb-1">Wallet Address</p>
                       <div className="flex items-center gap-2">
                         <code className="text-xs flex-1 truncate">{profile.btc_address}</code>
@@ -162,7 +177,10 @@ const Wallet: React.FC = () => {
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8"
-                          onClick={() => copyAddress(profile.btc_address, "BTC")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyAddress(profile.btc_address, "BTC");
+                          }}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -191,8 +209,8 @@ const Wallet: React.FC = () => {
             <CardContent>
               {isKycApproved ? (
                 <>
-                  <p className="text-2xl md:text-3xl font-bold mb-1">0.00 USDC</p>
-                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ $0.00</p>
+                  <p className="text-2xl md:text-3xl font-bold mb-1">{mockUsdcBalance.toFixed(2)} USDC</p>
+                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${mockUsdcBalance.toFixed(2)}</p>
                   {profile?.usdc_address && (
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-xs text-muted-foreground mb-1">Wallet Address</p>
@@ -235,6 +253,15 @@ const Wallet: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Buy/Sell BTC Modal */}
+        <BuySellBtcModal
+          open={buySellModalOpen}
+          onOpenChange={setBuySellModalOpen}
+          currentBtcPrice={currentBtcPrice}
+          btcBalance={mockBtcBalance}
+          usdcBalance={mockUsdcBalance}
+        />
       </div>
     </DashboardLayout>
   );
