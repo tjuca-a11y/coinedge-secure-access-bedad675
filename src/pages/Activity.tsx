@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,8 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
 import { useSwapOrders, SwapOrder } from "@/hooks/useSwapOrders";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import {
   DropdownMenu,
@@ -121,7 +123,8 @@ const mapSwapOrderToTransaction = (order: SwapOrder): Transaction => {
 };
 
 const Activity: React.FC = () => {
-  const { isKycApproved } = useAuth();
+  const { isKycApproved, user } = useAuth();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TransactionType>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
@@ -129,6 +132,41 @@ const Activity: React.FC = () => {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   const { data: swapOrders = [], isLoading, refetch } = useSwapOrders();
+
+  // Real-time subscription for user's swap orders
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('user-swap-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customer_swap_orders',
+          filter: `customer_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Swap order update:', payload);
+          queryClient.invalidateQueries({ queryKey: ['swap-orders', user.id] });
+          
+          if (payload.eventType === 'UPDATE') {
+            const newData = payload.new as SwapOrder;
+            if (newData.status === 'COMPLETED') {
+              toast.success('Order completed!', {
+                description: `Your ${newData.order_type === 'BUY_BTC' ? 'buy' : 'sell'} order has been completed`,
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   // Map swap orders to transactions
   const transactions: Transaction[] = swapOrders.map(mapSwapOrderToTransaction);
