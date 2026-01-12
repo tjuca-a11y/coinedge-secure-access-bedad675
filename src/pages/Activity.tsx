@@ -16,12 +16,24 @@ import {
   DollarSign,
   Bitcoin,
   TrendingDown,
-  AlertCircle
+  AlertCircle,
+  Check,
+  FileText,
+  FileSpreadsheet
 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Mock BTC price data
 const btcPriceData = [
@@ -97,10 +109,15 @@ const mockTransactions = [
   },
 ];
 
+type TransactionType = "all" | "received" | "sent" | "loans" | "interest";
+type SortOption = "newest" | "oldest" | "highest" | "lowest";
+
 const Activity: React.FC = () => {
   const { isKycApproved } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [lastRefresh, setLastRefresh] = useState(Date.now());
+  const [typeFilter, setTypeFilter] = useState<TransactionType>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
 
   const handleRefresh = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -112,10 +129,59 @@ const Activity: React.FC = () => {
     onRefresh: handleRefresh,
   });
 
-  const filteredTransactions = mockTransactions.filter((tx) =>
-    tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter transactions based on search and type filter
+  const filteredTransactions = mockTransactions.filter((tx) => {
+    const matchesSearch = 
+      tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tx.description.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (typeFilter === "all") return matchesSearch;
+    if (typeFilter === "received") return matchesSearch && tx.amount.startsWith("+");
+    if (typeFilter === "sent") return matchesSearch && tx.amount.startsWith("-") && !tx.title.includes("Interest");
+    if (typeFilter === "loans") return matchesSearch && tx.title.includes("Loan");
+    if (typeFilter === "interest") return matchesSearch && tx.title.includes("Interest");
+    return matchesSearch;
+  });
+
+  // Sort transactions
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    if (sortBy === "newest" || sortBy === "oldest") {
+      // For demo, we'll just reverse the array for oldest
+      return sortBy === "oldest" ? 1 : -1;
+    }
+    // Parse amounts for sorting by value
+    const parseAmount = (amt: string) => {
+      const num = parseFloat(amt.replace(/[^0-9.-]/g, ""));
+      return isNaN(num) ? 0 : Math.abs(num);
+    };
+    const amtA = parseAmount(a.amount);
+    const amtB = parseAmount(b.amount);
+    return sortBy === "highest" ? amtB - amtA : amtA - amtB;
+  });
+
+  const handleDownload = (format: "csv" | "pdf") => {
+    toast.success(`Downloading transactions as ${format.toUpperCase()}...`);
+    // In a real app, this would trigger an actual download
+  };
+
+  const getFilterLabel = () => {
+    switch (typeFilter) {
+      case "received": return "Received";
+      case "sent": return "Sent";
+      case "loans": return "Loans";
+      case "interest": return "Interest";
+      default: return "Filter";
+    }
+  };
+
+  const getSortLabel = () => {
+    switch (sortBy) {
+      case "oldest": return "Oldest first";
+      case "highest": return "Highest amount";
+      case "lowest": return "Lowest amount";
+      default: return "Sort";
+    }
+  };
 
   return (
     <DashboardLayout title="Activity" subtitle="View your transaction history">
@@ -242,18 +308,119 @@ const Activity: React.FC = () => {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-2" disabled={!isKycApproved}>
-              <Filter className="h-4 w-4" />
-              Filter
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" disabled={!isKycApproved}>
-              <ArrowUpDown className="h-4 w-4" />
-              Sort
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" disabled={!isKycApproved}>
-              <Download className="h-4 w-4" />
-              Download
-            </Button>
+            {/* Filter Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant={typeFilter !== "all" ? "default" : "outline"} 
+                  size="sm" 
+                  className="gap-2" 
+                  disabled={!isKycApproved}
+                >
+                  <Filter className="h-4 w-4" />
+                  {getFilterLabel()}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Filter by type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "all"}
+                  onCheckedChange={() => setTypeFilter("all")}
+                >
+                  All transactions
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "received"}
+                  onCheckedChange={() => setTypeFilter("received")}
+                >
+                  Received
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "sent"}
+                  onCheckedChange={() => setTypeFilter("sent")}
+                >
+                  Sent
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "loans"}
+                  onCheckedChange={() => setTypeFilter("loans")}
+                >
+                  Loans
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "interest"}
+                  onCheckedChange={() => setTypeFilter("interest")}
+                >
+                  Interest payments
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant={sortBy !== "newest" ? "default" : "outline"} 
+                  size="sm" 
+                  className="gap-2" 
+                  disabled={!isKycApproved}
+                >
+                  <ArrowUpDown className="h-4 w-4" />
+                  {getSortLabel()}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem 
+                  checked={sortBy === "newest"}
+                  onCheckedChange={() => setSortBy("newest")}
+                >
+                  Newest first
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={sortBy === "oldest"}
+                  onCheckedChange={() => setSortBy("oldest")}
+                >
+                  Oldest first
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={sortBy === "highest"}
+                  onCheckedChange={() => setSortBy("highest")}
+                >
+                  Highest amount
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={sortBy === "lowest"}
+                  onCheckedChange={() => setSortBy("lowest")}
+                >
+                  Lowest amount
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Download Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2" disabled={!isKycApproved}>
+                  <Download className="h-4 w-4" />
+                  Download
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Export transactions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleDownload("csv")} className="gap-2">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Download as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDownload("pdf")} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Download as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -281,7 +448,7 @@ const Activity: React.FC = () => {
               </CardContent>
             </Card>
           ) : (
-            filteredTransactions.map((tx) => {
+            sortedTransactions.map((tx) => {
               const IconComponent = tx.icon;
               return (
                 <Card key={tx.id} className="hover:bg-muted/50 transition-colors cursor-pointer">
