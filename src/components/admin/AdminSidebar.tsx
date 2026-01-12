@@ -16,6 +16,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+import {
+  Wallet,
+} from 'lucide-react';
+
 const navItems = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/map', label: 'Map', icon: Map },
@@ -24,6 +28,7 @@ const navItems = [
   { path: '/admin/sales-reps', label: 'Sales Reps', icon: Users },
   { path: '/admin/commissions', label: 'Commissions', icon: DollarSign },
   { path: '/admin/swap-orders', label: 'Buy/Sell Orders', icon: DollarSign },
+  { path: '/admin/treasury', label: 'Treasury', icon: Wallet },
   { path: '/admin/inventory', label: 'BTC Inventory', icon: Shield },
   { path: '/admin/inventory-lots', label: 'Inventory Lots', icon: CreditCard },
   { path: '/admin/fulfillment', label: 'Fulfillment Queue', icon: FileText },
