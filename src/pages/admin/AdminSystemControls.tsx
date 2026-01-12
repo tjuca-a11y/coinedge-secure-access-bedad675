@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -24,15 +24,24 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  Bell,
+  FileCheck,
+  ArrowRight,
+  AlertCircle,
+  PackageX,
 } from 'lucide-react';
 import {
   useSystemSettings,
   useUpdateSystemSetting,
   useSentTransfers,
   useDailyBtcSends,
+  useInventoryStats,
 } from '@/hooks/useBtcInventory';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { useAdminNotifications, useCreateNotification, useUnreadNotificationCount } from '@/hooks/useAdminNotifications';
+import { useLatestReconciliation } from '@/hooks/useReconciliation';
 import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
 
 const formatBtc = (amount: number | null) => {
   if (amount === null) return '—';
@@ -48,10 +57,15 @@ const formatCurrency = (amount: number | null) => {
 };
 
 const AdminSystemControls: React.FC = () => {
-  const { isSuperAdmin } = useAdminAuth();
+  const { isSuperAdmin, adminUser } = useAdminAuth();
   const { data: settings, isLoading: settingsLoading } = useSystemSettings();
   const { data: transfers, isLoading: transfersLoading } = useSentTransfers();
   const { data: dailySends } = useDailyBtcSends();
+  const { data: inventoryStats } = useInventoryStats();
+  const { data: unreadCount } = useUnreadNotificationCount();
+  const { data: notifications } = useAdminNotifications();
+  const { data: latestReconciliation } = useLatestReconciliation();
+  const createNotification = useCreateNotification();
   const updateSetting = useUpdateSystemSetting();
 
   const getSetting = (key: string) => settings?.find(s => s.setting_key === key)?.setting_value || '';
@@ -64,6 +78,21 @@ const AdminSystemControls: React.FC = () => {
 
   const todaysSends = dailySends?.find(d => d.send_date === new Date().toISOString().split('T')[0]);
 
+  // Check for low inventory and create notification if needed
+  const lowThresholdNum = parseFloat(lowThreshold) || 0;
+  const currentInventory = inventoryStats?.eligible_btc || 0;
+  const isLowInventory = lowThresholdNum > 0 && currentInventory < lowThresholdNum;
+
+  // Count failed transfers
+  const failedTransfers = transfers?.filter(t => t.status === 'FAILED') || [];
+  const recentFailures = failedTransfers.slice(0, 5);
+
+  // Check reconciliation status - latestReconciliation is a record keyed by asset type
+  const btcReconciliation = latestReconciliation?.['BTC'];
+  const hasOpenDiscrepancy = btcReconciliation?.status === 'DISCREPANCY' || 
+    latestReconciliation?.['USDC']?.status === 'DISCREPANCY' ||
+    latestReconciliation?.['COMPANY_USDC']?.status === 'DISCREPANCY';
+
   const handleToggle = async (key: string, currentValue: string) => {
     const newValue = currentValue === 'true' ? 'false' : 'true';
     await updateSetting.mutateAsync({ key, value: newValue });
@@ -71,6 +100,20 @@ const AdminSystemControls: React.FC = () => {
 
   const handleLimitChange = async (key: string, value: string) => {
     await updateSetting.mutateAsync({ key, value });
+  };
+
+  const handleCreateLowInventoryAlert = async () => {
+    await createNotification.mutateAsync({
+      type: 'LOW_BTC_INVENTORY',
+      severity: 'warning',
+      title: 'Low BTC Inventory Alert',
+      message: `BTC inventory (${formatBtc(currentInventory)}) is below the threshold of ${formatBtc(lowThresholdNum)}. Consider adding more inventory.`,
+      metadata: {
+        current_inventory: currentInventory,
+        threshold: lowThresholdNum,
+        created_by: adminUser?.id,
+      },
+    });
   };
 
   if (!isSuperAdmin) {
@@ -89,16 +132,122 @@ const AdminSystemControls: React.FC = () => {
 
   return (
     <AdminLayout title="System Controls" subtitle="BTC fulfillment system settings">
-      {/* Alerts */}
-      {payoutsPaused && (
-        <Alert variant="destructive" className="mb-6">
-          <Pause className="h-4 w-4" />
-          <AlertTitle>Payouts Paused</AlertTitle>
-          <AlertDescription>
-            All automatic BTC payouts are currently paused. Toggle off below to resume.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Critical Alerts Section */}
+      <div className="space-y-3 mb-6">
+        {payoutsPaused && (
+          <Alert variant="destructive">
+            <Pause className="h-4 w-4" />
+            <AlertTitle>Payouts Paused</AlertTitle>
+            <AlertDescription>
+              All automatic BTC payouts are currently paused. Toggle off below to resume.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLowInventory && (
+          <Alert variant="destructive">
+            <PackageX className="h-4 w-4" />
+            <AlertTitle>Low BTC Inventory</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Current eligible inventory ({formatBtc(currentInventory)}) is below threshold ({formatBtc(lowThresholdNum)}).
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateLowInventoryAlert}
+                disabled={createNotification.isPending}
+              >
+                <Bell className="h-4 w-4 mr-1" />
+                Create Alert
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {hasOpenDiscrepancy && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Open Reconciliation Discrepancy</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                There is an unresolved discrepancy. Please review treasury reconciliation.
+              </span>
+              <Link to="/admin/reconciliation">
+                <Button variant="outline" size="sm">
+                  <FileCheck className="h-4 w-4 mr-1" />
+                  View
+                </Button>
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {recentFailures.length > 0 && (
+          <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <AlertTitle>Failed Fulfillments</AlertTitle>
+            <AlertDescription>
+              {recentFailures.length} transfer(s) have failed. Check the transfer log below for details.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      {/* Quick Stats Bar */}
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
+        <Card className="bg-muted/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Unread Notifications</p>
+                <p className="text-2xl font-bold">{unreadCount || 0}</p>
+              </div>
+              <Bell className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isLowInventory ? 'bg-destructive/10 border-destructive' : 'bg-muted/50'}>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Eligible BTC</p>
+                <p className="text-2xl font-bold">{formatBtc(currentInventory)}</p>
+              </div>
+              <PackageX className={`h-8 w-8 ${isLowInventory ? 'text-destructive' : 'text-muted-foreground'}`} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-muted/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">System Status</p>
+                <Badge variant={autoSendEnabled && !payoutsPaused ? 'default' : 'destructive'} className="mt-1">
+                  {payoutsPaused ? 'PAUSED' : autoSendEnabled ? 'AUTO' : 'MANUAL'}
+                </Badge>
+              </div>
+              <Power className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-muted/50">
+          <CardContent className="pt-4 pb-3">
+            <Link to="/admin/reconciliation" className="flex items-center justify-between hover:opacity-80">
+              <div>
+                <p className="text-xs text-muted-foreground">Reconciliation</p>
+                <Badge variant={hasOpenDiscrepancy ? 'destructive' : 'outline'} className="mt-1">
+                  {hasOpenDiscrepancy ? 'DISCREPANCY' : 'OK'}
+                </Badge>
+              </div>
+              <ArrowRight className="h-6 w-6 text-muted-foreground" />
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* System Toggles */}
@@ -244,12 +393,54 @@ const AdminSystemControls: React.FC = () => {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <Badge variant={autoSendEnabled && !payoutsPaused ? 'default' : 'destructive'}>
-                  {payoutsPaused ? 'PAUSED' : autoSendEnabled ? 'AUTO' : 'MANUAL'}
-                </Badge>
+                <p className="text-sm text-muted-foreground">Failed Today</p>
+                <p className={`text-2xl font-bold ${recentFailures.length > 0 ? 'text-destructive' : ''}`}>
+                  {recentFailures.length}
+                </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>
+              Navigate to related admin pages
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Link to="/admin/reconciliation" className="block">
+              <Button variant="outline" className="w-full justify-between">
+                <span className="flex items-center gap-2">
+                  <FileCheck className="h-4 w-4" />
+                  Treasury Reconciliation
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link to="/admin/treasury" className="block">
+              <Button variant="outline" className="w-full justify-between">
+                <span className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Treasury Dashboard
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link to="/admin/fulfillment" className="block">
+              <Button variant="outline" className="w-full justify-between">
+                <span className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Fulfillment Queue
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
