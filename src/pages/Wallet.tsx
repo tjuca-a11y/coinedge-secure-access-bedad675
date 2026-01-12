@@ -10,6 +10,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
 import { BuySellBtcModal } from "@/components/wallet/BuySellBtcModal";
+import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
 
 // Mock price data
 const priceData = [
@@ -234,6 +235,13 @@ const Wallet: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Order History */}
+        {isKycApproved && (
+          <div className="mb-4 md:mb-6">
+            <SwapOrderHistory />
+          </div>
+        )}
 
         {/* Self-custody Notice */}
         {isKycApproved && (
