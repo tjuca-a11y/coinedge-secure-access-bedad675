@@ -44,6 +44,7 @@ import { useLatestReconciliation } from '@/hooks/useReconciliation';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { DollarSign, Coins } from 'lucide-react';
+import { TreasuryBalanceChart } from '@/components/admin/TreasuryBalanceChart';
 
 const formatBtc = (amount: number | null) => {
   if (amount === null) return '—';
@@ -79,13 +80,19 @@ const AdminSystemControls: React.FC = () => {
   const dailyLimit = getSetting('DAILY_BTC_LIMIT');
   const maxTxLimit = getSetting('MAX_TX_BTC_LIMIT');
   const lowThreshold = getSetting('LOW_INVENTORY_THRESHOLD_BTC');
+  const lowUsdcThreshold = getSetting('LOW_USDC_INVENTORY_THRESHOLD');
 
   const todaysSends = dailySends?.find(d => d.send_date === new Date().toISOString().split('T')[0]);
 
-  // Check for low inventory and create notification if needed
+  // Check for low BTC inventory
   const lowThresholdNum = parseFloat(lowThreshold) || 0;
   const currentInventory = inventoryStats?.eligible_btc || 0;
   const isLowInventory = lowThresholdNum > 0 && currentInventory < lowThresholdNum;
+
+  // Check for low USDC inventory
+  const lowUsdcThresholdNum = parseFloat(lowUsdcThreshold) || 0;
+  const currentUsdcInventory = usdcInventoryStats?.available_usdc || 0;
+  const isLowUsdcInventory = lowUsdcThresholdNum > 0 && currentUsdcInventory < lowUsdcThresholdNum;
 
   // Count failed transfers
   const failedTransfers = transfers?.filter(t => t.status === 'FAILED') || [];
@@ -106,18 +113,32 @@ const AdminSystemControls: React.FC = () => {
     await updateSetting.mutateAsync({ key, value });
   };
 
-  const handleCreateLowInventoryAlert = async () => {
-    await createNotification.mutateAsync({
-      type: 'LOW_BTC_INVENTORY',
-      severity: 'warning',
-      title: 'Low BTC Inventory Alert',
-      message: `BTC inventory (${formatBtc(currentInventory)}) is below the threshold of ${formatBtc(lowThresholdNum)}. Consider adding more inventory.`,
-      metadata: {
-        current_inventory: currentInventory,
-        threshold: lowThresholdNum,
-        created_by: adminUser?.id,
-      },
-    });
+  const handleCreateLowInventoryAlert = async (type: 'btc' | 'usdc') => {
+    if (type === 'btc') {
+      await createNotification.mutateAsync({
+        type: 'LOW_BTC_INVENTORY',
+        severity: 'warning',
+        title: 'Low BTC Inventory Alert',
+        message: `BTC inventory (${formatBtc(currentInventory)}) is below the threshold of ${formatBtc(lowThresholdNum)}. Consider adding more inventory.`,
+        metadata: {
+          current_inventory: currentInventory,
+          threshold: lowThresholdNum,
+          created_by: adminUser?.id,
+        },
+      });
+    } else {
+      await createNotification.mutateAsync({
+        type: 'LOW_USDC_INVENTORY',
+        severity: 'warning',
+        title: 'Low USDC Inventory Alert',
+        message: `USDC inventory (${formatCurrency(currentUsdcInventory)}) is below the threshold of ${formatCurrency(lowUsdcThresholdNum)}. Consider adding more inventory.`,
+        metadata: {
+          current_inventory: currentUsdcInventory,
+          threshold: lowUsdcThresholdNum,
+          created_by: adminUser?.id,
+        },
+      });
+    }
   };
 
   if (!isSuperAdmin) {
@@ -159,7 +180,28 @@ const AdminSystemControls: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleCreateLowInventoryAlert}
+                onClick={() => handleCreateLowInventoryAlert('btc')}
+                disabled={createNotification.isPending}
+              >
+                <Bell className="h-4 w-4 mr-1" />
+                Create Alert
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLowUsdcInventory && (
+          <Alert variant="destructive">
+            <DollarSign className="h-4 w-4" />
+            <AlertTitle>Low USDC Inventory</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Current USDC inventory ({formatCurrency(currentUsdcInventory)}) is below threshold ({formatCurrency(lowUsdcThresholdNum)}).
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCreateLowInventoryAlert('usdc')}
                 disabled={createNotification.isPending}
               >
                 <Bell className="h-4 w-4 mr-1" />
@@ -375,7 +417,7 @@ const AdminSystemControls: React.FC = () => {
                 </div>
                 
                 <div>
-                  <Label>Low Inventory Threshold</Label>
+                  <Label>Low BTC Threshold</Label>
                   <div className="flex gap-2 mt-1">
                     <Input
                       type="number"
@@ -385,6 +427,20 @@ const AdminSystemControls: React.FC = () => {
                       className="w-32"
                     />
                     <span className="self-center text-muted-foreground">BTC (alert below)</span>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Low USDC Threshold</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type="number"
+                      step="100"
+                      value={lowUsdcThreshold}
+                      onChange={(e) => handleLimitChange('LOW_USDC_INVENTORY_THRESHOLD', e.target.value)}
+                      className="w-32"
+                    />
+                    <span className="self-center text-muted-foreground">USD (alert below)</span>
                   </div>
                 </div>
               </>
@@ -471,6 +527,11 @@ const AdminSystemControls: React.FC = () => {
             </Link>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Treasury Balance Chart */}
+      <div className="mt-6">
+        <TreasuryBalanceChart />
       </div>
 
       {/* Transfer Log */}
