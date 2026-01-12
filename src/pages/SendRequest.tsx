@@ -82,7 +82,7 @@ const SendRequest: React.FC = () => {
     }
   };
 
-  const handlePay = () => {
+  const handleSend = () => {
     if (!isKycApproved) {
       toast.error("Complete KYC to send funds");
       return;
@@ -310,7 +310,7 @@ const SendRequest: React.FC = () => {
               Request
             </Button>
             <Button
-              onClick={handlePay}
+              onClick={handleSend}
               disabled={!isKycApproved}
               className="flex-1 h-12 md:h-14 text-base md:text-lg font-medium rounded-full bg-muted hover:bg-muted/80 text-foreground"
             >
