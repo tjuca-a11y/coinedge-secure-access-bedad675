@@ -60,6 +60,9 @@ import {
   useCashoutOrders,
   useUpdateCashoutOrder,
   useTreasuryOverview,
+  useCompanyUsdcBalance,
+  useCompanyUsdcLedger,
+  useUpdateCompanyUsdcBalance,
 } from '@/hooks/useTreasury';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -75,14 +78,18 @@ const AdminTreasuryDashboard: React.FC = () => {
   const { data: cashoutOrders, isLoading: cashoutLoading } = useCashoutOrders();
   const { data: settings } = useSystemSettings();
   const { data: overview } = useTreasuryOverview();
+  const { data: companyUsdc, isLoading: companyLoading } = useCompanyUsdcBalance();
+  const { data: companyLedger } = useCompanyUsdcLedger();
   
   const createWallet = useCreateTreasuryWallet();
   const createUsdcLot = useCreateUsdcInventoryLot();
   const updateCashoutOrder = useUpdateCashoutOrder();
   const updateSetting = useUpdateSystemSetting();
+  const updateCompanyUsdc = useUpdateCompanyUsdcBalance();
 
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [usdcLotDialogOpen, setUsdcLotDialogOpen] = useState(false);
+  const [companyUsdcDialogOpen, setCompanyUsdcDialogOpen] = useState(false);
   const [walletForm, setWalletForm] = useState({
     fireblocks_vault_id: '',
     fireblocks_wallet_id: '',
@@ -94,6 +101,12 @@ const AdminTreasuryDashboard: React.FC = () => {
     amount: '',
     source: 'manual_topup' as const,
     reference_id: '',
+    notes: '',
+  });
+  const [companyUsdcForm, setCompanyUsdcForm] = useState({
+    amount: '',
+    type: 'DEPOSIT' as 'DEPOSIT' | 'WITHDRAWAL' | 'FEE_COLLECTION' | 'OPERATIONAL_EXPENSE' | 'ADJUSTMENT',
+    reference: '',
     notes: '',
   });
 
@@ -136,6 +149,17 @@ const AdminTreasuryDashboard: React.FC = () => {
       updates.status = 'PROCESSING';
     }
     await updateCashoutOrder.mutateAsync({ id: orderId, updates });
+  };
+
+  const handleCompanyUsdcTransaction = async () => {
+    await updateCompanyUsdc.mutateAsync({
+      amount: parseFloat(companyUsdcForm.amount),
+      type: companyUsdcForm.type,
+      reference: companyUsdcForm.reference || undefined,
+      notes: companyUsdcForm.notes || undefined,
+    });
+    setCompanyUsdcDialogOpen(false);
+    setCompanyUsdcForm({ amount: '', type: 'DEPOSIT', reference: '', notes: '' });
   };
 
   const getCashoutStatusBadge = (status: string) => {
@@ -302,7 +326,7 @@ const AdminTreasuryDashboard: React.FC = () => {
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
         <Card className="border-orange-500/20 bg-orange-500/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-orange-600">BTC Eligible</CardTitle>
@@ -320,7 +344,7 @@ const AdminTreasuryDashboard: React.FC = () => {
 
         <Card className="border-blue-500/20 bg-blue-500/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-blue-600">USDC Available</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-600">Customer USDC</CardTitle>
             <DollarSign className="h-5 w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
@@ -328,7 +352,22 @@ const AdminTreasuryDashboard: React.FC = () => {
               {usdcStatsLoading ? '...' : formatUsdc(usdcStats?.available_usdc || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {usdcStats?.lots_count || 0} lots
+              {usdcStats?.lots_count || 0} inventory lots
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-500/20 bg-purple-500/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-purple-600">Company USDC</CardTitle>
+            <Building2 className="h-5 w-5 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">
+              {companyLoading ? '...' : formatUsdc(Number(companyUsdc?.balance_usdc || 0))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Operational funds
             </p>
           </CardContent>
         </Card>
@@ -336,7 +375,7 @@ const AdminTreasuryDashboard: React.FC = () => {
         <Card className="border-green-500/20 bg-green-500/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-green-600">Pending Cashouts</CardTitle>
-            <Building2 className="h-5 w-5 text-green-600" />
+            <ArrowUpFromLine className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
@@ -368,10 +407,11 @@ const AdminTreasuryDashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Tabs for USDC Lots and Cashout Orders */}
+      {/* Tabs for USDC Lots, Company USDC, and Cashout Orders */}
       <Tabs defaultValue="usdc-lots" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="usdc-lots">USDC Inventory</TabsTrigger>
+          <TabsTrigger value="usdc-lots">Customer USDC Inventory</TabsTrigger>
+          <TabsTrigger value="company-usdc">Company USDC</TabsTrigger>
           <TabsTrigger value="cashouts">
             Cash-out Orders
             {pendingCashouts.length > 0 && (
@@ -383,7 +423,10 @@ const AdminTreasuryDashboard: React.FC = () => {
         <TabsContent value="usdc-lots">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>USDC Inventory Lots</CardTitle>
+              <div>
+                <CardTitle>Customer USDC Inventory</CardTitle>
+                <CardDescription>USDC held for customer swaps and fulfillment</CardDescription>
+              </div>
               <Dialog open={usdcLotDialogOpen} onOpenChange={setUsdcLotDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" disabled={!wallet}>
@@ -487,6 +530,156 @@ const AdminTreasuryDashboard: React.FC = () => {
               ) : (
                 <div className="py-8 text-center text-muted-foreground">
                   No USDC inventory lots. Click "Add USDC" to record inventory.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="company-usdc">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Company USDC</CardTitle>
+                <CardDescription>Operational funds separate from customer inventory</CardDescription>
+              </div>
+              <Dialog open={companyUsdcDialogOpen} onOpenChange={setCompanyUsdcDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Transaction
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Company USDC Transaction</DialogTitle>
+                    <DialogDescription>
+                      Record deposits, withdrawals, or adjustments to company funds.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Type *</Label>
+                      <Select
+                        value={companyUsdcForm.type}
+                        onValueChange={(value) => setCompanyUsdcForm({ ...companyUsdcForm, type: value as typeof companyUsdcForm.type })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DEPOSIT">Deposit</SelectItem>
+                          <SelectItem value="WITHDRAWAL">Withdrawal</SelectItem>
+                          <SelectItem value="FEE_COLLECTION">Fee Collection</SelectItem>
+                          <SelectItem value="OPERATIONAL_EXPENSE">Operational Expense</SelectItem>
+                          <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Amount (USDC) *</Label>
+                      <Input
+                        type="number"
+                        value={companyUsdcForm.amount}
+                        onChange={(e) => setCompanyUsdcForm({ ...companyUsdcForm, amount: e.target.value })}
+                        placeholder="1000"
+                      />
+                    </div>
+                    <div>
+                      <Label>Reference</Label>
+                      <Input
+                        value={companyUsdcForm.reference}
+                        onChange={(e) => setCompanyUsdcForm({ ...companyUsdcForm, reference: e.target.value })}
+                        placeholder="TX hash or invoice #"
+                      />
+                    </div>
+                    <div>
+                      <Label>Notes</Label>
+                      <Input
+                        value={companyUsdcForm.notes}
+                        onChange={(e) => setCompanyUsdcForm({ ...companyUsdcForm, notes: e.target.value })}
+                        placeholder="Optional notes"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCompanyUsdcDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleCompanyUsdcTransaction} 
+                      disabled={!companyUsdcForm.amount || updateCompanyUsdc.isPending}
+                    >
+                      {updateCompanyUsdc.isPending ? 'Processing...' : 'Submit'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <Card className="border-purple-500/20 bg-purple-500/5">
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-purple-600 font-medium">Current Balance</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {formatUsdc(Number(companyUsdc?.balance_usdc || 0))}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Last updated: {companyUsdc?.last_updated_at 
+                        ? formatDistanceToNow(new Date(companyUsdc.last_updated_at), { addSuffix: true })
+                        : 'Never'}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-muted-foreground font-medium">Recent Activity</p>
+                    <p className="text-3xl font-bold">{companyLedger?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Total transactions</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {companyLedger && companyLedger.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companyLedger.slice(0, 15).map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>
+                          <Badge 
+                            variant={['WITHDRAWAL', 'OPERATIONAL_EXPENSE'].includes(entry.type) ? 'destructive' : 'default'}
+                          >
+                            {entry.type.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={Number(entry.amount_usdc) < 0 ? 'text-red-600' : 'text-green-600'}>
+                          {Number(entry.amount_usdc) >= 0 ? '+' : ''}{formatUsdc(Number(entry.amount_usdc))}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {entry.reference || '—'}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate">
+                          {entry.notes || '—'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  No company USDC transactions yet. Click "Add Transaction" to record activity.
                 </div>
               )}
             </CardContent>

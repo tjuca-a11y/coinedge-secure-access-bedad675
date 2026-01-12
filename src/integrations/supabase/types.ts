@@ -488,6 +488,73 @@ export type Database = {
           },
         ]
       }
+      company_usdc_balance: {
+        Row: {
+          balance_usdc: number
+          id: string
+          last_updated_at: string
+          updated_by_admin_id: string | null
+        }
+        Insert: {
+          balance_usdc?: number
+          id?: string
+          last_updated_at?: string
+          updated_by_admin_id?: string | null
+        }
+        Update: {
+          balance_usdc?: number
+          id?: string
+          last_updated_at?: string
+          updated_by_admin_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_usdc_balance_updated_by_admin_id_fkey"
+            columns: ["updated_by_admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_usdc_ledger: {
+        Row: {
+          amount_usdc: number
+          created_at: string
+          created_by_admin_id: string | null
+          id: string
+          notes: string | null
+          reference: string | null
+          type: string
+        }
+        Insert: {
+          amount_usdc: number
+          created_at?: string
+          created_by_admin_id?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          type: string
+        }
+        Update: {
+          amount_usdc?: number
+          created_at?: string
+          created_by_admin_id?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_usdc_ledger_created_by_admin_id_fkey"
+            columns: ["created_by_admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_swap_orders: {
         Row: {
           btc_amount: number
