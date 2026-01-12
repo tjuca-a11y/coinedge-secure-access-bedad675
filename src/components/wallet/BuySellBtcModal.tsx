@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Bitcoin, DollarSign, Loader2, AlertCircle } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ArrowRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wallet, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +25,7 @@ interface BuySellBtcModalProps {
 }
 
 type OrderType = "BUY_BTC" | "SELL_BTC";
+type PaymentMethod = "usdc_wallet" | "plaid_bank";
 
 export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   open,
@@ -37,6 +38,8 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("usdc_wallet");
+  const [isPlaidConnected, setIsPlaidConnected] = useState(false);
 
   // Calculate conversion
   const usdAmount = parseFloat(amount) || 0;
@@ -52,7 +55,13 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   // Reset amount when tab changes
   useEffect(() => {
     setAmount("");
+    setPaymentMethod("usdc_wallet");
   }, [activeTab]);
+
+  const handleConnectPlaid = () => {
+    // TODO: Integrate with Plaid Link
+    toast.info("Plaid integration coming soon! For now, please use your USDC wallet.");
+  };
 
   const handleSubmit = async () => {
     if (!user || !profile) {
@@ -71,8 +80,13 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
     const feeAmt = activeTab === "buy" ? fee : sellFee;
 
     // Validation
-    if (activeTab === "buy" && totalCost > usdcBalance) {
+    if (activeTab === "buy" && paymentMethod === "usdc_wallet" && totalCost > usdcBalance) {
       toast.error("Insufficient USDC balance");
+      return;
+    }
+
+    if (activeTab === "buy" && paymentMethod === "plaid_bank" && !isPlaidConnected) {
+      toast.error("Please connect your bank account first");
       return;
     }
 
@@ -155,12 +169,65 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4 mt-4">
+            {/* Payment Method Selection */}
+            <div className="space-y-3">
+              <Label>Payment Method</Label>
+              <RadioGroup
+                value={paymentMethod}
+                onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
+                className="grid grid-cols-2 gap-3"
+              >
+                <Label
+                  htmlFor="usdc_wallet"
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    paymentMethod === "usdc_wallet"
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <RadioGroupItem value="usdc_wallet" id="usdc_wallet" className="sr-only" />
+                  <Wallet className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">USDC Wallet</span>
+                  <span className="text-xs text-muted-foreground">${usdcBalance.toFixed(2)}</span>
+                </Label>
+                <Label
+                  htmlFor="plaid_bank"
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    paymentMethod === "plaid_bank"
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <RadioGroupItem value="plaid_bank" id="plaid_bank" className="sr-only" />
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">Bank Account</span>
+                  <span className="text-xs text-muted-foreground">
+                    {isPlaidConnected ? "Connected" : "Via Plaid"}
+                  </span>
+                </Label>
+              </RadioGroup>
+            </div>
+
+            {/* Plaid Connect Button */}
+            {paymentMethod === "plaid_bank" && !isPlaidConnected && (
+              <Button
+                variant="outline"
+                onClick={handleConnectPlaid}
+                className="w-full gap-2"
+              >
+                <Building2 className="h-4 w-4" />
+                Connect Bank Account
+              </Button>
+            )}
+
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label>Amount (USD)</Label>
-                <span className="text-xs text-muted-foreground">
-                  Available: ${usdcBalance.toFixed(2)} USDC
-                </span>
+                {paymentMethod === "usdc_wallet" && (
+                  <span className="text-xs text-muted-foreground">
+                    Available: ${usdcBalance.toFixed(2)} USDC
+                  </span>
+                )}
               </div>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -172,19 +239,21 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
                   className="pl-9"
                 />
               </div>
-              <div className="flex gap-2">
-                {[0.25, 0.5, 0.75, 1].map((pct) => (
-                  <Button
-                    key={pct}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setQuickAmount(pct)}
-                    className="flex-1 text-xs"
-                  >
-                    {pct === 1 ? "Max" : `${pct * 100}%`}
-                  </Button>
-                ))}
-              </div>
+              {paymentMethod === "usdc_wallet" && (
+                <div className="flex gap-2">
+                  {[0.25, 0.5, 0.75, 1].map((pct) => (
+                    <Button
+                      key={pct}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setQuickAmount(pct)}
+                      className="flex-1 text-xs"
+                    >
+                      {pct === 1 ? "Max" : `${pct * 100}%`}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Card className="p-4 space-y-3 bg-muted/50">
@@ -209,16 +278,28 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
               </div>
             </Card>
 
-            {totalCost > usdcBalance && amount && (
+            {paymentMethod === "usdc_wallet" && totalCost > usdcBalance && amount && (
               <div className="flex items-center gap-2 text-destructive text-sm">
                 <AlertCircle className="h-4 w-4" />
                 Insufficient USDC balance
               </div>
             )}
 
+            {paymentMethod === "plaid_bank" && !isPlaidConnected && amount && (
+              <div className="flex items-center gap-2 text-amber-600 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                Connect your bank account to continue
+              </div>
+            )}
+
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !amount || totalCost > usdcBalance}
+              disabled={
+                isSubmitting || 
+                !amount || 
+                (paymentMethod === "usdc_wallet" && totalCost > usdcBalance) ||
+                (paymentMethod === "plaid_bank" && !isPlaidConnected)
+              }
               className="w-full"
             >
               {isSubmitting ? (
