@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -47,8 +48,9 @@ import {
   Copy,
   ExternalLink,
   RefreshCw,
+  Send,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -72,11 +74,13 @@ interface SwapOrder {
 
 const AdminSwapOrders: React.FC = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<SwapOrder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [txHashInput, setTxHashInput] = useState('');
 
   const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-swap-orders'],
@@ -90,6 +94,36 @@ const AdminSwapOrders: React.FC = () => {
       return data as SwapOrder[];
     },
   });
+
+  // Real-time subscription for swap orders
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-swap-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customer_swap_orders',
+        },
+        (payload) => {
+          console.log('Swap order change:', payload);
+          queryClient.invalidateQueries({ queryKey: ['admin-swap-orders'] });
+          
+          if (payload.eventType === 'INSERT') {
+            toast({
+              title: 'New Order',
+              description: `New ${(payload.new as SwapOrder).order_type === 'BUY_BTC' ? 'buy' : 'sell'} order received`,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, toast]);
 
   const handleProcessOrder = async (orderId: string, newStatus: 'PENDING' | 'PROCESSING' | 'CANCELLED') => {
     setIsProcessing(true);
@@ -142,6 +176,7 @@ const AdminSwapOrders: React.FC = () => {
       });
       refetch();
       setSelectedOrder(null);
+      setTxHashInput('');
     } catch (error) {
       toast({ 
         title: 'Error', 
@@ -153,11 +188,91 @@ const AdminSwapOrders: React.FC = () => {
     }
   };
 
+  const handleMarkAsSent = async (orderId: string) => {
+    if (!txHashInput.trim()) {
+      toast({
+        title: 'Transaction Hash Required',
+        description: 'Please enter the BTC transaction hash',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('customer_swap_orders')
+        .update({ 
+          status: 'COMPLETED' as const,
+          tx_hash: txHashInput.trim(),
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: 'BTC Sent', 
+        description: 'Order marked as sent with transaction hash' 
+      });
+      refetch();
+      setSelectedOrder(null);
+      setTxHashInput('');
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to update order',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateTxHash = async (orderId: string) => {
+    if (!txHashInput.trim()) {
+      toast({
+        title: 'Transaction Hash Required',
+        description: 'Please enter the BTC transaction hash',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('customer_swap_orders')
+        .update({ tx_hash: txHashInput.trim() })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: 'Transaction Hash Updated', 
+        description: 'The transaction hash has been saved' 
+      });
+      refetch();
+      // Update the selected order locally
+      setSelectedOrder(prev => prev ? { ...prev, tx_hash: txHashInput.trim() } : null);
+      setTxHashInput('');
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to update transaction hash',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (order.destination_address?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+      (order.destination_address?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+      (order.tx_hash?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
 
     const matchesType = typeFilter === 'all' || order.order_type === typeFilter;
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
@@ -578,21 +693,58 @@ const AdminSwapOrders: React.FC = () => {
               </div>
 
               {/* Admin Actions */}
-              {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'FAILED') && (
-                <div className="pt-4 border-t border-border space-y-2">
+              {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'PROCESSING' || selectedOrder.status === 'FAILED') && (
+                <div className="pt-4 border-t border-border space-y-3">
                   <p className="text-sm font-medium text-muted-foreground">Admin Actions</p>
+                  
+                  {/* Transaction Hash Input */}
+                  {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'PROCESSING') && selectedOrder.order_type === 'BUY_BTC' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="tx-hash" className="text-sm">Transaction Hash</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="tx-hash"
+                          placeholder="Enter BTC transaction hash..."
+                          value={txHashInput}
+                          onChange={(e) => setTxHashInput(e.target.value)}
+                          className="font-mono text-sm"
+                        />
+                        {selectedOrder.tx_hash ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleUpdateTxHash(selectedOrder.id)}
+                            disabled={isProcessing || !txHashInput.trim()}
+                          >
+                            Update
+                          </Button>
+                        ) : null}
+                      </div>
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        onClick={() => handleMarkAsSent(selectedOrder.id)}
+                        disabled={isProcessing || !txHashInput.trim()}
+                      >
+                        <Send className={`h-4 w-4 mr-2`} />
+                        {isProcessing ? 'Processing...' : 'Mark as Sent & Complete'}
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     {selectedOrder.status === 'PENDING' && (
                       <>
                         <Button 
                           variant="default" 
                           size="sm" 
-                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700"
                           onClick={() => handleProcessOrder(selectedOrder.id, 'PROCESSING')}
                           disabled={isProcessing}
                         >
                           <RefreshCw className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-spin' : ''}`} />
-                          Process Order
+                          Process
                         </Button>
                         <Button 
                           variant="destructive" 
@@ -605,6 +757,18 @@ const AdminSwapOrders: React.FC = () => {
                           Cancel
                         </Button>
                       </>
+                    )}
+                    {selectedOrder.status === 'PROCESSING' && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleProcessOrder(selectedOrder.id, 'CANCELLED')}
+                        disabled={isProcessing}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancel Order
+                      </Button>
                     )}
                     {selectedOrder.status === 'FAILED' && (
                       <Button 
@@ -620,7 +784,7 @@ const AdminSwapOrders: React.FC = () => {
                     )}
                   </div>
                   
-                  {selectedOrder.status === 'PENDING' && (
+                  {selectedOrder.status === 'PENDING' && selectedOrder.order_type === 'SELL_BTC' && (
                     <Button 
                       variant="outline" 
                       size="sm" 
