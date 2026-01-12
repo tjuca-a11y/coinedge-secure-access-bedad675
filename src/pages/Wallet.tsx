@@ -202,7 +202,7 @@ const Wallet: React.FC = () => {
                   <p className="text-sm text-muted-foreground">BTC</p>
                 </div>
                 {isKycApproved && (
-                  <span className="text-xs text-muted-foreground">Tap to trade</span>
+                  <span className="text-xs text-muted-foreground">Tap to manage</span>
                 )}
               </div>
             </CardHeader>
