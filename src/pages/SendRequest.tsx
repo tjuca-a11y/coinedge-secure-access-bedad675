@@ -52,9 +52,9 @@ const SendRequest: React.FC = () => {
 
   // Send flow state
   const [sendStep, setSendStep] = useState<SendStep>("closed");
-  const [payRecipient, setPayRecipient] = useState("");
-  const [selectedPayContact, setSelectedPayContact] = useState<Contact | null>(null);
-  const [paySearchQuery, setPaySearchQuery] = useState("");
+  const [sendRecipient, setSendRecipient] = useState("");
+  const [selectedSendContact, setSelectedSendContact] = useState<Contact | null>(null);
+  const [sendSearchQuery, setSendSearchQuery] = useState("");
 
   const handleNumberPress = (num: string) => {
     if (!isKycApproved) {
@@ -178,26 +178,26 @@ const SendRequest: React.FC = () => {
 
   // Send handlers
   const handleSelectSendContact = (contact: Contact) => {
-    setSelectedPayContact(contact);
+    setSelectedSendContact(contact);
     setSendStep("confirm");
   };
 
   const handleManualSendRecipient = () => {
-    if (!payRecipient.trim()) {
+    if (!sendRecipient.trim()) {
       toast.error("Enter a recipient address or email");
       return;
     }
-    setSelectedPayContact({ 
+    setSelectedSendContact({ 
       id: "manual", 
-      name: payRecipient, 
-      initials: payRecipient.slice(0, 2).toUpperCase(), 
+      name: sendRecipient, 
+      initials: sendRecipient.slice(0, 2).toUpperCase(), 
       color: "bg-muted" 
     });
     setSendStep("confirm");
   };
 
   const handleConfirmSend = () => {
-    const recipientName = selectedPayContact?.name || payRecipient;
+    const recipientName = selectedSendContact?.name || sendRecipient;
     toast.success(`Sent ${formatAmount(amount)} to ${recipientName}`);
     resetSendFlow();
   };
@@ -207,8 +207,8 @@ const SendRequest: React.FC = () => {
   };
 
   const handleSendScanComplete = (address: string) => {
-    setPayRecipient(address);
-    setSelectedPayContact({ 
+    setSendRecipient(address);
+    setSelectedSendContact({ 
       id: "scanned", 
       name: address, 
       initials: "QR", 
@@ -219,16 +219,16 @@ const SendRequest: React.FC = () => {
 
   const resetSendFlow = () => {
     setSendStep("closed");
-    setPayRecipient("");
-    setSelectedPayContact(null);
-    setPaySearchQuery("");
+    setSendRecipient("");
+    setSelectedSendContact(null);
+    setSendSearchQuery("");
     setAmount("0");
   };
 
   const handleSendBack = () => {
     if (sendStep === "confirm" || sendStep === "scanner") {
       setSendStep("recipient");
-      setSelectedPayContact(null);
+      setSelectedSendContact(null);
     } else {
       setSendStep("closed");
     }
@@ -243,10 +243,10 @@ const SendRequest: React.FC = () => {
     return `$${num.toLocaleString()}`;
   };
 
-  const filteredPayContacts = recentContacts.filter(contact => 
-    contact.name.toLowerCase().includes(paySearchQuery.toLowerCase()) ||
-    contact.email?.toLowerCase().includes(paySearchQuery.toLowerCase()) ||
-    contact.address?.toLowerCase().includes(paySearchQuery.toLowerCase())
+  const filteredSendContacts = recentContacts.filter(contact => 
+    contact.name.toLowerCase().includes(sendSearchQuery.toLowerCase()) ||
+    contact.email?.toLowerCase().includes(sendSearchQuery.toLowerCase()) ||
+    contact.address?.toLowerCase().includes(sendSearchQuery.toLowerCase())
   );
 
   const filteredRequestContacts = recentContacts.filter(contact => 
@@ -590,23 +590,23 @@ const SendRequest: React.FC = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  value={payRecipient}
+                  value={sendRecipient}
                   onChange={(e) => {
-                    setPayRecipient(e.target.value);
-                    setPaySearchQuery(e.target.value);
+                    setSendRecipient(e.target.value);
+                    setSendSearchQuery(e.target.value);
                   }}
                   placeholder="Email, phone, or wallet address"
                   className="pl-10 h-12 rounded-xl bg-muted/50 border-0"
                 />
               </div>
 
-              {payRecipient && (
+              {sendRecipient && (
                 <Button
                   onClick={handleManualSendRecipient}
                   variant="secondary"
                   className="w-full h-12 rounded-full"
                 >
-                  Send to "{payRecipient}"
+                  Send to "{sendRecipient}"
                 </Button>
               )}
 
@@ -627,7 +627,7 @@ const SendRequest: React.FC = () => {
                 Recent
               </h3>
               <div className="space-y-2">
-                {filteredPayContacts.map((contact) => (
+                {filteredSendContacts.map((contact) => (
                   <button
                     key={contact.id}
                     onClick={() => handleSelectSendContact(contact)}
@@ -668,17 +668,17 @@ const SendRequest: React.FC = () => {
                 Send {formatAmount(amount)}
               </h2>
               
-              {selectedPayContact && (
+              {selectedSendContact && (
                 <div className="flex flex-col items-center gap-3">
-                  <Avatar className={`h-16 w-16 ${selectedPayContact.color}`}>
+                  <Avatar className={`h-16 w-16 ${selectedSendContact.color}`}>
                     <AvatarFallback className="text-white text-xl font-medium">
-                      {selectedPayContact.initials}
+                      {selectedSendContact.initials}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium text-foreground text-lg">{selectedPayContact.name}</p>
-                    {selectedPayContact.email && (
-                      <p className="text-sm text-muted-foreground">{selectedPayContact.email}</p>
+                    <p className="font-medium text-foreground text-lg">{selectedSendContact.name}</p>
+                    {selectedSendContact.email && (
+                      <p className="text-sm text-muted-foreground">{selectedSendContact.email}</p>
                     )}
                   </div>
                 </div>
