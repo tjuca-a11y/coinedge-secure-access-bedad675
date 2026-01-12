@@ -37,6 +37,7 @@ import AdminFulfillmentQueue from "./pages/admin/AdminFulfillmentQueue";
 import AdminSystemControls from "./pages/admin/AdminSystemControls";
 import AdminSwapOrders from "./pages/admin/AdminSwapOrders";
 import AdminTreasuryDashboard from "./pages/admin/AdminTreasuryDashboard";
+import AdminReconciliation from "./pages/admin/AdminReconciliation";
 
 // Sales Rep pages
 import SalesRepLogin from "./pages/sales-rep/SalesRepLogin";
@@ -85,6 +86,7 @@ const App = () => (
                 <Route path="fulfillment" element={<AdminProtectedRoute><AdminFulfillmentQueue /></AdminProtectedRoute>} />
                 <Route path="swap-orders" element={<AdminProtectedRoute><AdminSwapOrders /></AdminProtectedRoute>} />
                 <Route path="treasury" element={<AdminProtectedRoute><AdminTreasuryDashboard /></AdminProtectedRoute>} />
+                <Route path="reconciliation" element={<AdminProtectedRoute><AdminReconciliation /></AdminProtectedRoute>} />
                 <Route path="system-controls" element={<AdminProtectedRoute requireSuperAdmin><AdminSystemControls /></AdminProtectedRoute>} />
                 <Route path="audit-logs" element={<AdminProtectedRoute><AdminAuditLogs /></AdminProtectedRoute>} />
                 <Route path="map" element={<AdminProtectedRoute><AdminMap /></AdminProtectedRoute>} />

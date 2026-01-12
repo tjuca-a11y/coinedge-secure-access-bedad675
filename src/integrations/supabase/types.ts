@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          created_at: string
+          dismissed_at: string | null
+          dismissed_by_admin_id: string | null
+          id: string
+          is_dismissed: boolean
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          notification_id: string
+          read_at: string | null
+          severity: string
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          dismissed_at?: string | null
+          dismissed_by_admin_id?: string | null
+          id?: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          notification_id?: string
+          read_at?: string | null
+          severity?: string
+          title: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          dismissed_at?: string | null
+          dismissed_by_admin_id?: string | null
+          id?: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          notification_id?: string
+          read_at?: string | null
+          severity?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_dismissed_by_admin_id_fkey"
+            columns: ["dismissed_by_admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_users: {
         Row: {
           created_at: string
@@ -1352,6 +1408,69 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      treasury_reconciliation: {
+        Row: {
+          asset_type: string
+          created_at: string
+          created_by_admin_id: string | null
+          database_balance: number
+          discrepancy: number | null
+          discrepancy_pct: number | null
+          id: string
+          notes: string | null
+          onchain_balance: number
+          reconciliation_id: string
+          resolved_at: string | null
+          resolved_by_admin_id: string | null
+          status: string
+        }
+        Insert: {
+          asset_type: string
+          created_at?: string
+          created_by_admin_id?: string | null
+          database_balance: number
+          discrepancy?: number | null
+          discrepancy_pct?: number | null
+          id?: string
+          notes?: string | null
+          onchain_balance: number
+          reconciliation_id?: string
+          resolved_at?: string | null
+          resolved_by_admin_id?: string | null
+          status?: string
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          created_by_admin_id?: string | null
+          database_balance?: number
+          discrepancy?: number | null
+          discrepancy_pct?: number | null
+          id?: string
+          notes?: string | null
+          onchain_balance?: number
+          reconciliation_id?: string
+          resolved_at?: string | null
+          resolved_by_admin_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_reconciliation_created_by_admin_id_fkey"
+            columns: ["created_by_admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_reconciliation_resolved_by_admin_id_fkey"
+            columns: ["resolved_by_admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       treasury_wallet: {
         Row: {

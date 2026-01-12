@@ -18,7 +18,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 import {
   Wallet,
+  Scale,
 } from 'lucide-react';
+import { AdminNotificationBell } from './AdminNotificationBell';
 
 const navItems = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,6 +31,7 @@ const navItems = [
   { path: '/admin/commissions', label: 'Commissions', icon: DollarSign },
   { path: '/admin/swap-orders', label: 'Buy/Sell Orders', icon: DollarSign },
   { path: '/admin/treasury', label: 'Treasury', icon: Wallet },
+  { path: '/admin/reconciliation', label: 'Reconciliation', icon: Scale },
   { path: '/admin/inventory', label: 'BTC Inventory', icon: Shield },
   { path: '/admin/inventory-lots', label: 'Inventory Lots', icon: CreditCard },
   { path: '/admin/fulfillment', label: 'Fulfillment Queue', icon: FileText },
@@ -48,12 +51,15 @@ export const AdminSidebar: React.FC = () => {
   return (
     <div className="flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-        <Shield className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-lg font-bold text-sidebar-foreground">CoinEdge</h1>
-          <p className="text-xs text-sidebar-foreground/60">Admin Console</p>
+      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-6">
+        <div className="flex items-center gap-2">
+          <Shield className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-lg font-bold text-sidebar-foreground">CoinEdge</h1>
+            <p className="text-xs text-sidebar-foreground/60">Admin Console</p>
+          </div>
         </div>
+        <AdminNotificationBell />
       </div>
 
       {/* Navigation */}
