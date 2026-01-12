@@ -37,11 +37,13 @@ import {
   useDailyBtcSends,
   useInventoryStats,
 } from '@/hooks/useBtcInventory';
+import { useUsdcInventoryStats, useCompanyUsdcBalance } from '@/hooks/useTreasury';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { useAdminNotifications, useCreateNotification, useUnreadNotificationCount } from '@/hooks/useAdminNotifications';
 import { useLatestReconciliation } from '@/hooks/useReconciliation';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { DollarSign, Coins } from 'lucide-react';
 
 const formatBtc = (amount: number | null) => {
   if (amount === null) return '—';
@@ -62,6 +64,8 @@ const AdminSystemControls: React.FC = () => {
   const { data: transfers, isLoading: transfersLoading } = useSentTransfers();
   const { data: dailySends } = useDailyBtcSends();
   const { data: inventoryStats } = useInventoryStats();
+  const { data: usdcInventoryStats } = useUsdcInventoryStats();
+  const { data: companyUsdcBalance } = useCompanyUsdcBalance();
   const { data: unreadCount } = useUnreadNotificationCount();
   const { data: notifications } = useAdminNotifications();
   const { data: latestReconciliation } = useLatestReconciliation();
@@ -195,12 +199,12 @@ const AdminSystemControls: React.FC = () => {
       </div>
 
       {/* Quick Stats Bar */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6 mb-6">
         <Card className="bg-muted/50">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Unread Notifications</p>
+                <p className="text-xs text-muted-foreground">Notifications</p>
                 <p className="text-2xl font-bold">{unreadCount || 0}</p>
               </div>
               <Bell className="h-8 w-8 text-muted-foreground" />
@@ -215,7 +219,31 @@ const AdminSystemControls: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Eligible BTC</p>
                 <p className="text-2xl font-bold">{formatBtc(currentInventory)}</p>
               </div>
-              <PackageX className={`h-8 w-8 ${isLowInventory ? 'text-destructive' : 'text-muted-foreground'}`} />
+              <Coins className={`h-8 w-8 ${isLowInventory ? 'text-destructive' : 'text-muted-foreground'}`} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-muted/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">USDC Inventory</p>
+                <p className="text-2xl font-bold">{formatCurrency(usdcInventoryStats?.available_usdc || 0)}</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-muted/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Company USDC</p>
+                <p className="text-2xl font-bold">{formatCurrency(companyUsdcBalance?.balance_usdc || 0)}</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
