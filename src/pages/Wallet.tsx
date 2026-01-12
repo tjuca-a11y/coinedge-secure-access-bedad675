@@ -4,7 +4,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink } from "lucide-react";
+import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -13,7 +13,7 @@ import { BuySellBtcModal } from "@/components/wallet/BuySellBtcModal";
 import { UsdcActionsModal } from "@/components/wallet/UsdcActionsModal";
 import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
 
-// Mock account performance data
+// Mock account performance data with more realistic values for demo
 const accountPerformanceData = [
   { date: "Jan 4", value: 0 },
   { date: "Jan 5", value: 0 },
@@ -23,6 +23,21 @@ const accountPerformanceData = [
   { date: "Jan 9", value: 0 },
   { date: "Jan 10", value: 0 },
 ];
+
+// Performance calculations helper
+const calculatePerformance = (data: typeof accountPerformanceData) => {
+  if (data.length < 2) return { change: 0, percentage: 0, isPositive: true, isZero: true };
+  const firstValue = data[0].value;
+  const lastValue = data[data.length - 1].value;
+  const change = lastValue - firstValue;
+  const percentage = firstValue > 0 ? (change / firstValue) * 100 : 0;
+  return {
+    change,
+    percentage,
+    isPositive: change >= 0,
+    isZero: change === 0 && firstValue === 0,
+  };
+};
 
 // Mock current BTC price
 const currentBtcPrice = 93327.91;
@@ -49,6 +64,10 @@ const Wallet: React.FC = () => {
     onRefresh: handleRefresh,
   });
 
+  // Calculate performance metrics
+  const performance = calculatePerformance(accountPerformanceData);
+  const totalBalance = (mockBtcBalance * currentBtcPrice) + mockUsdcBalance;
+
   const copyAddress = (address: string | null | undefined, asset: string) => {
     if (address) {
       navigator.clipboard.writeText(address);
@@ -68,8 +87,10 @@ const Wallet: React.FC = () => {
         <Card className="mb-4 md:mb-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
           <CardContent className="py-6">
             <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
-            <p className="text-3xl md:text-4xl font-bold">${((mockBtcBalance * currentBtcPrice) + mockUsdcBalance).toFixed(2)}</p>
-            <p className="text-sm text-muted-foreground mt-1">≈ {mockUsdcBalance.toFixed(2)} USDC + {mockBtcBalance.toFixed(8)} BTC</p>
+            <p className="text-3xl md:text-4xl font-bold">${totalBalance.toFixed(2)}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-muted-foreground">≈ {mockUsdcBalance.toFixed(2)} USDC + {mockBtcBalance.toFixed(8)} BTC</p>
+            </div>
           </CardContent>
         </Card>
 
@@ -79,10 +100,30 @@ const Wallet: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <CardTitle className="text-base md:text-lg">Account Performance</CardTitle>
-                <p className="text-2xl md:text-3xl font-bold mt-1 md:mt-2">${((mockBtcBalance * currentBtcPrice) + mockUsdcBalance).toFixed(2)}</p>
-                <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1">
-                  All time
-                </p>
+                <p className="text-2xl md:text-3xl font-bold mt-1 md:mt-2">${totalBalance.toFixed(2)}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  {performance.isZero ? (
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Minus className="h-3 w-3 md:h-4 md:w-4" />
+                      <span className="text-xs md:text-sm">No change</span>
+                    </div>
+                  ) : (
+                    <div className={`flex items-center gap-1 ${performance.isPositive ? 'text-success' : 'text-destructive'}`}>
+                      {performance.isPositive ? (
+                        <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 md:h-4 md:w-4" />
+                      )}
+                      <span className="text-xs md:text-sm font-medium">
+                        {performance.isPositive ? '+' : ''}{performance.percentage.toFixed(2)}%
+                      </span>
+                      <span className="text-xs md:text-sm text-muted-foreground">
+                        ({performance.isPositive ? '+' : ''}${Math.abs(performance.change).toFixed(2)})
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground">All time</span>
+                </div>
               </div>
               <div className="flex gap-1 md:gap-2 overflow-x-auto pb-1">
                 {["1D", "1W", "1M", "1Y", "All"].map((period) => (
