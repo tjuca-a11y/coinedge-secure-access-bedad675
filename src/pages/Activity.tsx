@@ -23,12 +23,16 @@ import {
   X,
   Copy,
   ExternalLink,
-  ShoppingCart
+  ShoppingCart,
+  Clock,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
+import { useSwapOrders, SwapOrder } from "@/hooks/useSwapOrders";
+import { format } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +65,7 @@ const mockBtcValue = mockBtcBalance * currentBtcPrice;
 
 interface Transaction {
   id: string;
+  order_id?: string;
   title: string;
   description: string;
   date: string;
@@ -70,211 +75,122 @@ interface Transaction {
   iconBg: string;
   iconColor: string;
   type: "buy_btc" | "sell_btc" | "buy_usdc" | "sell_usdc" | "received" | "sent" | "loan" | "interest" | "gift";
-  status: "completed" | "pending" | "failed";
+  status: "completed" | "pending" | "processing" | "failed" | "cancelled";
   txHash?: string;
   fee?: string;
   fromAddress?: string;
   toAddress?: string;
   usdValue?: string;
+  btcAmount?: number;
+  usdcAmount?: number;
+  btcPrice?: number;
+  destinationAddress?: string;
+  failedReason?: string;
 }
-
-// Mock transaction data with more variety
-const mockTransactions: Transaction[] = [
-  {
-    id: "1",
-    title: "Bought Bitcoin",
-    description: "Purchased 0.025 BTC with USDC",
-    date: "Today at 2:45 PM",
-    amount: "+0.025 BTC",
-    amountColor: "text-success",
-    icon: ShoppingCart,
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
-    type: "buy_btc",
-    status: "completed",
-    txHash: "0x1a2b3c4d5e6f...",
-    fee: "$2.50",
-    usdValue: "$2,333.20",
-  },
-  {
-    id: "2",
-    title: "Sold Bitcoin",
-    description: "Sold 0.01 BTC for USDC",
-    date: "Yesterday at 11:30 AM",
-    amount: "-0.01 BTC",
-    amountColor: "text-foreground",
-    icon: ArrowUpRight,
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-600",
-    type: "sell_btc",
-    status: "completed",
-    txHash: "0x2b3c4d5e6f7a...",
-    fee: "$1.25",
-    usdValue: "$933.28",
-  },
-  {
-    id: "3",
-    title: "Bought USDC",
-    description: "Purchased $500 USDC",
-    date: "Jan 10 at 3:15 PM",
-    amount: "+$500.00",
-    amountColor: "text-success",
-    icon: ShoppingCart,
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-    type: "buy_usdc",
-    status: "completed",
-    fee: "$0.50",
-    usdValue: "$500.00",
-  },
-  {
-    id: "4",
-    title: "Sold USDC",
-    description: "Withdrew $200 to bank",
-    date: "Jan 8 at 10:00 AM",
-    amount: "-$200.00",
-    amountColor: "text-foreground",
-    icon: ArrowUpRight,
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
-    type: "sell_usdc",
-    status: "completed",
-    fee: "$1.00",
-    usdValue: "$200.00",
-  },
-  {
-    id: "5",
-    title: "BTC Gift Card Redeemed",
-    description: "0.0005 BTC added to wallet",
-    date: "Jan 5 at 2:45 PM",
-    amount: "+0.0005 BTC",
-    amountColor: "text-success",
-    icon: Gift,
-    iconBg: "bg-amber-100",
-    iconColor: "text-amber-600",
-    type: "gift",
-    status: "completed",
-    usdValue: "$46.66",
-  },
-  {
-    id: "6",
-    title: "Loan Initiated",
-    description: "Bitcoin-backed loan · 0.5 BTC collateral",
-    date: "Nov 15 at 10:30 AM",
-    amount: "+$20,000",
-    amountColor: "text-foreground",
-    icon: Wallet,
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-    type: "loan",
-    status: "completed",
-    usdValue: "$20,000",
-  },
-  {
-    id: "7",
-    title: "BTC Transfer Completed",
-    description: "Sent to external wallet",
-    date: "Nov 12 at 4:15 PM",
-    amount: "-0.015 BTC",
-    amountColor: "text-foreground",
-    icon: ArrowUpRight,
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-600",
-    type: "sent",
-    status: "completed",
-    txHash: "0x3c4d5e6f7a8b...",
-    fee: "$1.50",
-    toAddress: "bc1q...xyz",
-    usdValue: "$1,399.92",
-  },
-  {
-    id: "8",
-    title: "Collateral Deposited",
-    description: "Secured via Fireblocks",
-    date: "Nov 10 at 9:22 AM",
-    amount: "+0.5 BTC",
-    amountColor: "text-success",
-    icon: ArrowDownLeft,
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
-    type: "received",
-    status: "completed",
-    txHash: "0x4d5e6f7a8b9c...",
-    fromAddress: "bc1q...abc",
-    usdValue: "$46,663.96",
-  },
-  {
-    id: "9",
-    title: "Interest Payment Processed",
-    description: "Monthly loan interest deducted",
-    date: "Nov 5 at 12:00 PM",
-    amount: "-$83.33",
-    amountColor: "text-foreground",
-    icon: DollarSign,
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
-    type: "interest",
-    status: "completed",
-    usdValue: "$83.33",
-  },
-];
 
 type TransactionType = "all" | "received" | "sent" | "loans" | "interest" | "buy_btc" | "sell_btc" | "buy_usdc" | "sell_usdc";
 type SortOption = "newest" | "oldest" | "highest" | "lowest";
 
+const mapSwapOrderToTransaction = (order: SwapOrder): Transaction => {
+  const isBuy = order.order_type === "BUY_BTC";
+  
+  return {
+    id: order.id,
+    order_id: order.order_id,
+    title: isBuy ? "Bought Bitcoin" : "Sold Bitcoin",
+    description: isBuy 
+      ? `Purchased ${order.btc_amount.toFixed(8)} BTC with USDC`
+      : `Sold ${order.btc_amount.toFixed(8)} BTC for USDC`,
+    date: format(new Date(order.created_at), "MMM d 'at' h:mm a"),
+    amount: isBuy ? `+${order.btc_amount.toFixed(8)} BTC` : `-${order.btc_amount.toFixed(8)} BTC`,
+    amountColor: isBuy ? "text-success" : "text-foreground",
+    icon: isBuy ? ShoppingCart : ArrowUpRight,
+    iconBg: isBuy ? "bg-green-100" : "bg-orange-100",
+    iconColor: isBuy ? "text-green-600" : "text-orange-600",
+    type: isBuy ? "buy_btc" : "sell_btc",
+    status: order.status.toLowerCase() as Transaction["status"],
+    txHash: order.tx_hash || undefined,
+    fee: `$${order.fee_usdc.toFixed(2)}`,
+    usdValue: `$${order.usdc_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    btcAmount: order.btc_amount,
+    usdcAmount: order.usdc_amount,
+    btcPrice: order.btc_price_at_order,
+    destinationAddress: order.destination_address || undefined,
+    failedReason: order.failed_reason || undefined,
+  };
+};
+
 const Activity: React.FC = () => {
   const { isKycApproved } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [typeFilter, setTypeFilter] = useState<TransactionType>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
+  const { data: swapOrders = [], isLoading, refetch } = useSwapOrders();
+
+  // Map swap orders to transactions
+  const transactions: Transaction[] = swapOrders.map(mapSwapOrderToTransaction);
+
   const handleRefresh = useCallback(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setLastRefresh(Date.now());
+    await refetch();
     toast.success("Activity refreshed");
-  }, []);
+  }, [refetch]);
 
   const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: handleRefresh,
   });
 
   // Filter transactions based on search and type filter
-  const filteredTransactions = mockTransactions.filter((tx) => {
+  const filteredTransactions = transactions.filter((tx) => {
     const matchesSearch = 
       tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tx.description.toLowerCase().includes(searchQuery.toLowerCase());
+      tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (tx.order_id?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
     
     if (typeFilter === "all") return matchesSearch;
-    if (typeFilter === "received") return matchesSearch && (tx.type === "received" || tx.type === "gift");
-    if (typeFilter === "sent") return matchesSearch && tx.type === "sent";
-    if (typeFilter === "loans") return matchesSearch && tx.type === "loan";
-    if (typeFilter === "interest") return matchesSearch && tx.type === "interest";
     if (typeFilter === "buy_btc") return matchesSearch && tx.type === "buy_btc";
     if (typeFilter === "sell_btc") return matchesSearch && tx.type === "sell_btc";
-    if (typeFilter === "buy_usdc") return matchesSearch && tx.type === "buy_usdc";
-    if (typeFilter === "sell_usdc") return matchesSearch && tx.type === "sell_usdc";
     return matchesSearch;
   });
 
   // Sort transactions
   const sortedTransactions = [...filteredTransactions].sort((a, b) => {
-    if (sortBy === "newest" || sortBy === "oldest") {
-      return sortBy === "oldest" ? 1 : -1;
+    if (sortBy === "newest") {
+      return -1; // Already sorted by newest from query
     }
-    const parseAmount = (amt: string) => {
-      const num = parseFloat(amt.replace(/[^0-9.-]/g, ""));
-      return isNaN(num) ? 0 : Math.abs(num);
-    };
-    const amtA = parseAmount(a.amount);
-    const amtB = parseAmount(b.amount);
+    if (sortBy === "oldest") {
+      return 1;
+    }
+    const amtA = Math.abs(a.btcAmount || 0);
+    const amtB = Math.abs(b.btcAmount || 0);
     return sortBy === "highest" ? amtB - amtA : amtA - amtB;
   });
 
-  const handleDownload = (format: "csv" | "pdf") => {
-    toast.success(`Downloading transactions as ${format.toUpperCase()}...`);
+  const handleDownload = (formatType: "csv" | "pdf") => {
+    if (formatType === "csv" && transactions.length > 0) {
+      const headers = ['Order ID', 'Type', 'Status', 'BTC Amount', 'USDC Amount', 'Fee', 'Date'];
+      const rows = transactions.map((tx) => [
+        tx.order_id || tx.id,
+        tx.type,
+        tx.status,
+        tx.btcAmount?.toFixed(8) || '',
+        tx.usdcAmount?.toFixed(2) || '',
+        tx.fee || '',
+        tx.date,
+      ]);
+      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      toast.success("Transactions downloaded as CSV");
+    } else {
+      toast.success(`Downloading transactions as ${formatType.toUpperCase()}...`);
+    }
   };
 
   const handleTransactionClick = (tx: Transaction) => {
@@ -289,16 +205,17 @@ const Activity: React.FC = () => {
     }
   };
 
+  const handleCopyOrderId = () => {
+    if (selectedTransaction?.order_id) {
+      navigator.clipboard.writeText(selectedTransaction.order_id);
+      toast.success("Order ID copied");
+    }
+  };
+
   const getFilterLabel = () => {
     switch (typeFilter) {
-      case "received": return "Received";
-      case "sent": return "Sent";
-      case "loans": return "Loans";
-      case "interest": return "Interest";
       case "buy_btc": return "Buy BTC";
       case "sell_btc": return "Sell BTC";
-      case "buy_usdc": return "Buy USDC";
-      case "sell_usdc": return "Sell USDC";
       default: return "Filter";
     }
   };
@@ -324,13 +241,28 @@ const Activity: React.FC = () => {
       case "pending":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+            <Clock className="h-3 w-3" />
             Pending
+          </span>
+        );
+      case "processing":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+            <RefreshCw className="h-3 w-3 animate-spin" />
+            Processing
           </span>
         );
       case "failed":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/10 text-destructive text-xs font-medium">
+            <X className="h-3 w-3" />
             Failed
+          </span>
+        );
+      case "cancelled":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
+            Cancelled
           </span>
         );
       default:
@@ -445,7 +377,7 @@ const Activity: React.FC = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, description, amount, or $cashtag"
+              placeholder="Search by order ID, description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -488,46 +420,6 @@ const Activity: React.FC = () => {
                   onCheckedChange={() => setTypeFilter("sell_btc")}
                 >
                   Sell BTC
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">USDC</DropdownMenuLabel>
-                <DropdownMenuCheckboxItem 
-                  checked={typeFilter === "buy_usdc"}
-                  onCheckedChange={() => setTypeFilter("buy_usdc")}
-                >
-                  Buy USDC
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={typeFilter === "sell_usdc"}
-                  onCheckedChange={() => setTypeFilter("sell_usdc")}
-                >
-                  Sell USDC
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Other</DropdownMenuLabel>
-                <DropdownMenuCheckboxItem 
-                  checked={typeFilter === "received"}
-                  onCheckedChange={() => setTypeFilter("received")}
-                >
-                  Received
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={typeFilter === "sent"}
-                  onCheckedChange={() => setTypeFilter("sent")}
-                >
-                  Sent
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={typeFilter === "loans"}
-                  onCheckedChange={() => setTypeFilter("loans")}
-                >
-                  Loans
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={typeFilter === "interest"}
-                  onCheckedChange={() => setTypeFilter("interest")}
-                >
-                  Interest payments
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -605,9 +497,6 @@ const Activity: React.FC = () => {
           <p className="text-sm font-medium text-muted-foreground">Amount</p>
         </div>
 
-        {/* Month Header */}
-        <p className="text-sm font-semibold mb-3 px-1">January 2026</p>
-
         {/* Transaction List */}
         <div className="space-y-1">
           {!isKycApproved ? (
@@ -616,10 +505,18 @@ const Activity: React.FC = () => {
                 Complete KYC to view your transaction history
               </CardContent>
             </Card>
-          ) : filteredTransactions.length === 0 ? (
+          ) : isLoading ? (
+            <Card>
+              <CardContent className="py-8 flex items-center justify-center">
+                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ) : sortedTransactions.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                No transactions found
+                <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No transactions yet</p>
+                <p className="text-sm mt-2">Your buy and sell orders will appear here</p>
               </CardContent>
             </Card>
           ) : (
@@ -636,7 +533,10 @@ const Activity: React.FC = () => {
                       <IconComponent className={`h-4 w-4 ${tx.iconColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{tx.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{tx.title}</p>
+                        {tx.status !== "completed" && getStatusBadge(tx.status)}
+                      </div>
                       <p className="text-xs text-muted-foreground truncate">{tx.description}</p>
                       <p className="text-xs text-muted-foreground">{tx.date}</p>
                     </div>
@@ -688,29 +588,43 @@ const Activity: React.FC = () => {
 
               {/* Transaction Details */}
               <div className="space-y-3">
+                {selectedTransaction.order_id && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Order ID</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium font-mono text-xs">{selectedTransaction.order_id}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyOrderId}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Date</span>
                   <span className="font-medium">{selectedTransaction.date}</span>
                 </div>
+
+                {selectedTransaction.btcPrice && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">BTC Price</span>
+                    <span className="font-medium">${selectedTransaction.btcPrice.toLocaleString()}</span>
+                  </div>
+                )}
                 
                 {selectedTransaction.fee && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Network Fee</span>
+                    <span className="text-muted-foreground">Fee</span>
                     <span className="font-medium">{selectedTransaction.fee}</span>
                   </div>
                 )}
 
-                {selectedTransaction.fromAddress && (
+                {selectedTransaction.destinationAddress && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">From</span>
-                    <span className="font-medium font-mono text-xs">{selectedTransaction.fromAddress}</span>
-                  </div>
-                )}
-
-                {selectedTransaction.toAddress && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">To</span>
-                    <span className="font-medium font-mono text-xs">{selectedTransaction.toAddress}</span>
+                    <span className="text-muted-foreground">Destination</span>
+                    <span className="font-medium font-mono text-xs truncate max-w-[180px]">
+                      {selectedTransaction.destinationAddress}
+                    </span>
                   </div>
                 )}
 
@@ -718,11 +632,18 @@ const Activity: React.FC = () => {
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Transaction ID</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium font-mono text-xs">{selectedTransaction.txHash}</span>
+                      <span className="font-medium font-mono text-xs truncate max-w-[120px]">{selectedTransaction.txHash}</span>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTxHash}>
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {selectedTransaction.failedReason && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="text-sm text-destructive font-medium">Failed Reason</p>
+                    <p className="text-sm text-muted-foreground">{selectedTransaction.failedReason}</p>
                   </div>
                 )}
               </div>
@@ -733,9 +654,11 @@ const Activity: React.FC = () => {
                   Close
                 </Button>
                 {selectedTransaction.txHash && (
-                  <Button variant="default" className="flex-1 gap-2">
-                    <ExternalLink className="h-4 w-4" />
-                    View on Explorer
+                  <Button variant="default" className="flex-1 gap-2" asChild>
+                    <a href={`https://mempool.space/tx/${selectedTransaction.txHash}`} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      View on Explorer
+                    </a>
                   </Button>
                 )}
               </div>

@@ -76,6 +76,7 @@ const AdminSwapOrders: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<SwapOrder | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-swap-orders'],
@@ -89,6 +90,68 @@ const AdminSwapOrders: React.FC = () => {
       return data as SwapOrder[];
     },
   });
+
+  const handleProcessOrder = async (orderId: string, newStatus: 'PENDING' | 'PROCESSING' | 'CANCELLED') => {
+    setIsProcessing(true);
+    try {
+      const updateData: { status: 'PENDING' | 'PROCESSING' | 'CANCELLED'; failed_reason?: null } = { status: newStatus };
+      if (newStatus === 'PENDING') {
+        updateData.failed_reason = null;
+      }
+      
+      const { error } = await supabase
+        .from('customer_swap_orders')
+        .update(updateData)
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: 'Order Updated', 
+        description: `Order status changed to ${newStatus}` 
+      });
+      refetch();
+      setSelectedOrder(null);
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to update order status',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCompleteOrder = async (orderId: string) => {
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('customer_swap_orders')
+        .update({ 
+          status: 'COMPLETED',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: 'Order Completed', 
+        description: 'Order has been marked as completed' 
+      });
+      refetch();
+      setSelectedOrder(null);
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to complete order',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -513,6 +576,64 @@ const AdminSwapOrders: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Admin Actions */}
+              {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'FAILED') && (
+                <div className="pt-4 border-t border-border space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Admin Actions</p>
+                  <div className="flex gap-2">
+                    {selectedOrder.status === 'PENDING' && (
+                      <>
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          onClick={() => handleProcessOrder(selectedOrder.id, 'PROCESSING')}
+                          disabled={isProcessing}
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-spin' : ''}`} />
+                          Process Order
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => handleProcessOrder(selectedOrder.id, 'CANCELLED')}
+                          disabled={isProcessing}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                    {selectedOrder.status === 'FAILED' && (
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleProcessOrder(selectedOrder.id, 'PENDING')}
+                        disabled={isProcessing}
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-spin' : ''}`} />
+                        Retry Order
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {selectedOrder.status === 'PENDING' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full bg-green-600/10 border-green-600/30 text-green-400 hover:bg-green-600/20"
+                      onClick={() => handleCompleteOrder(selectedOrder.id)}
+                      disabled={isProcessing}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark as Completed
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
