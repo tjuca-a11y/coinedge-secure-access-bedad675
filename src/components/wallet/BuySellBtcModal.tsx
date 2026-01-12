@@ -11,10 +11,22 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wallet, Building2 } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wallet, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+
+// Mock price data for BTC chart
+const btcPriceData = [
+  { date: "Jan 4", btc: 91000 },
+  { date: "Jan 5", btc: 92500 },
+  { date: "Jan 6", btc: 90800 },
+  { date: "Jan 7", btc: 93200 },
+  { date: "Jan 8", btc: 92100 },
+  { date: "Jan 9", btc: 94500 },
+  { date: "Jan 10", btc: 93327 },
+];
 
 interface BuySellBtcModalProps {
   open: boolean;
@@ -155,6 +167,45 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
             Buy or Sell Bitcoin
           </DialogTitle>
         </DialogHeader>
+
+        {/* Bitcoin Price Chart */}
+        <Card className="mb-4 bg-muted/30">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Bitcoin Price</p>
+                <p className="text-xl font-bold">${currentBtcPrice.toLocaleString()}</p>
+                <p className="text-xs text-success flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" />
+                  +2.05% today
+                </p>
+              </div>
+            </div>
+            <div className="h-[100px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={btcPriceData}>
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                  <YAxis hide domain={["dataMin - 1000", "dataMax + 1000"]} />
+                  <Tooltip 
+                    formatter={(value: number) => [`$${value.toLocaleString()}`, "BTC"]}
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="btc" 
+                    stroke="hsl(var(--btc))" 
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "buy" | "sell")}>
           <TabsList className="grid w-full grid-cols-2">
