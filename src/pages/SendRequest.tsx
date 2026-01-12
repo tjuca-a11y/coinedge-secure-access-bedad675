@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 type RequestStep = "closed" | "description" | "recipient" | "confirm" | "scanner";
-type PayStep = "closed" | "recipient" | "confirm" | "scanner";
+type SendStep = "closed" | "recipient" | "confirm" | "scanner";
 
 interface Contact {
   id: string;
@@ -50,8 +50,8 @@ const SendRequest: React.FC = () => {
   const [selectedRequestContact, setSelectedRequestContact] = useState<Contact | null>(null);
   const [requestSearchQuery, setRequestSearchQuery] = useState("");
 
-  // Pay flow state
-  const [payStep, setPayStep] = useState<PayStep>("closed");
+  // Send flow state
+  const [sendStep, setSendStep] = useState<SendStep>("closed");
   const [payRecipient, setPayRecipient] = useState("");
   const [selectedPayContact, setSelectedPayContact] = useState<Contact | null>(null);
   const [paySearchQuery, setPaySearchQuery] = useState("");
@@ -91,7 +91,7 @@ const SendRequest: React.FC = () => {
       toast.error("Enter an amount");
       return;
     }
-    setPayStep("recipient");
+    setSendStep("recipient");
   };
 
   const handleRequest = () => {
@@ -176,13 +176,13 @@ const SendRequest: React.FC = () => {
     }
   };
 
-  // Pay handlers
-  const handleSelectPayContact = (contact: Contact) => {
+  // Send handlers
+  const handleSelectSendContact = (contact: Contact) => {
     setSelectedPayContact(contact);
-    setPayStep("confirm");
+    setSendStep("confirm");
   };
 
-  const handleManualPayRecipient = () => {
+  const handleManualSendRecipient = () => {
     if (!payRecipient.trim()) {
       toast.error("Enter a recipient address or email");
       return;
@@ -193,20 +193,20 @@ const SendRequest: React.FC = () => {
       initials: payRecipient.slice(0, 2).toUpperCase(), 
       color: "bg-muted" 
     });
-    setPayStep("confirm");
+    setSendStep("confirm");
   };
 
-  const handleConfirmPay = () => {
+  const handleConfirmSend = () => {
     const recipientName = selectedPayContact?.name || payRecipient;
     toast.success(`Sent ${formatAmount(amount)} to ${recipientName}`);
-    resetPayFlow();
+    resetSendFlow();
   };
 
-  const handleOpenPayScanner = () => {
-    setPayStep("scanner");
+  const handleOpenSendScanner = () => {
+    setSendStep("scanner");
   };
 
-  const handlePayScanComplete = (address: string) => {
+  const handleSendScanComplete = (address: string) => {
     setPayRecipient(address);
     setSelectedPayContact({ 
       id: "scanned", 
@@ -214,23 +214,23 @@ const SendRequest: React.FC = () => {
       initials: "QR", 
       color: "bg-primary" 
     });
-    setPayStep("confirm");
+    setSendStep("confirm");
   };
 
-  const resetPayFlow = () => {
-    setPayStep("closed");
+  const resetSendFlow = () => {
+    setSendStep("closed");
     setPayRecipient("");
     setSelectedPayContact(null);
     setPaySearchQuery("");
     setAmount("0");
   };
 
-  const handlePayBack = () => {
-    if (payStep === "confirm" || payStep === "scanner") {
-      setPayStep("recipient");
+  const handleSendBack = () => {
+    if (sendStep === "confirm" || sendStep === "scanner") {
+      setSendStep("recipient");
       setSelectedPayContact(null);
     } else {
-      setPayStep("closed");
+      setSendStep("closed");
     }
   };
 
@@ -567,12 +567,12 @@ const SendRequest: React.FC = () => {
         </DrawerContent>
       </Drawer>
 
-      {/* Pay Recipient Selection Drawer */}
-      <Drawer open={payStep === "recipient"} onOpenChange={(open) => !open && setPayStep("closed")}>
+      {/* Send Recipient Selection Drawer */}
+      <Drawer open={sendStep === "recipient"} onOpenChange={(open) => !open && setSendStep("closed")}>
         <DrawerContent className="bg-card border-t border-border max-h-[85vh]">
           <div className="p-6 space-y-6 overflow-y-auto">
             <button 
-              onClick={() => setPayStep("closed")}
+              onClick={() => setSendStep("closed")}
               className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors z-10"
             >
               <X className="h-5 w-5 text-foreground" />
@@ -580,7 +580,7 @@ const SendRequest: React.FC = () => {
 
             <div className="pt-4">
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                Pay {formatAmount(amount)}
+                Send {formatAmount(amount)}
               </h2>
               <p className="text-muted-foreground mt-1">Select recipient</p>
             </div>
@@ -602,7 +602,7 @@ const SendRequest: React.FC = () => {
 
               {payRecipient && (
                 <Button
-                  onClick={handleManualPayRecipient}
+                  onClick={handleManualSendRecipient}
                   variant="secondary"
                   className="w-full h-12 rounded-full"
                 >
@@ -612,7 +612,7 @@ const SendRequest: React.FC = () => {
 
               {/* Scan QR Button */}
               <Button
-                onClick={handleOpenPayScanner}
+                onClick={handleOpenSendScanner}
                 variant="outline"
                 className="w-full h-12 rounded-full border-2"
               >
@@ -630,7 +630,7 @@ const SendRequest: React.FC = () => {
                 {filteredPayContacts.map((contact) => (
                   <button
                     key={contact.id}
-                    onClick={() => handleSelectPayContact(contact)}
+                    onClick={() => handleSelectSendContact(contact)}
                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-left"
                   >
                     <Avatar className={`h-12 w-12 ${contact.color}`}>
@@ -652,12 +652,12 @@ const SendRequest: React.FC = () => {
         </DrawerContent>
       </Drawer>
 
-      {/* Pay Confirm Drawer */}
-      <Drawer open={payStep === "confirm"} onOpenChange={(open) => !open && setPayStep("closed")}>
+      {/* Send Confirm Drawer */}
+      <Drawer open={sendStep === "confirm"} onOpenChange={(open) => !open && setSendStep("closed")}>
         <DrawerContent className="bg-card border-t border-border">
           <div className="p-6 space-y-6">
             <button 
-              onClick={handlePayBack}
+              onClick={handleSendBack}
               className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors"
             >
               <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -665,7 +665,7 @@ const SendRequest: React.FC = () => {
 
             <div className="pt-4 text-center space-y-4">
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                Pay {formatAmount(amount)}
+                Send {formatAmount(amount)}
               </h2>
               
               {selectedPayContact && (
@@ -687,13 +687,13 @@ const SendRequest: React.FC = () => {
 
             <div className="space-y-3 pt-4">
               <Button
-                onClick={handleConfirmPay}
+                onClick={handleConfirmSend}
                 className="w-full h-14 text-base font-medium rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-                Confirm Payment
+                Confirm Send
               </Button>
               <Button
-                onClick={handlePayBack}
+                onClick={handleSendBack}
                 variant="ghost"
                 className="w-full h-12 text-base font-medium rounded-full"
               >
@@ -704,12 +704,12 @@ const SendRequest: React.FC = () => {
         </DrawerContent>
       </Drawer>
 
-      {/* Pay QR Scanner Drawer */}
-      <Drawer open={payStep === "scanner"} onOpenChange={(open) => !open && setPayStep("closed")}>
+      {/* Send QR Scanner Drawer */}
+      <Drawer open={sendStep === "scanner"} onOpenChange={(open) => !open && setSendStep("closed")}>
         <DrawerContent className="bg-card border-t border-border">
           <div className="p-6 space-y-6">
             <button 
-              onClick={handlePayBack}
+              onClick={handleSendBack}
               className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors z-10"
             >
               <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -740,7 +740,7 @@ const SendRequest: React.FC = () => {
             </div>
 
             <Button
-              onClick={() => handlePayScanComplete("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")}
+              onClick={() => handleSendScanComplete("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")}
               variant="secondary"
               className="w-full h-12 rounded-full"
             >
