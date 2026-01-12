@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.process-fulfillment-queue]
 verify_jwt = false
+
+# Cron job to run fulfillment queue processing every 5 minutes
+[[cron]]
+schedule = "*/5 * * * *"
+endpoint = "/functions/v1/process-fulfillment-queue"
+body = "{}"

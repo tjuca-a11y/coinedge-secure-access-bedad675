@@ -294,6 +294,133 @@ export const useUpdateCashoutOrder = () => {
 };
 
 // =====================================================
+// Company USDC Hooks (Operational Funds)
+// =====================================================
+
+export interface CompanyUsdcBalance {
+  id: string;
+  balance_usdc: number;
+  last_updated_at: string;
+  updated_by_admin_id: string | null;
+}
+
+export interface CompanyUsdcLedgerEntry {
+  id: string;
+  amount_usdc: number;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'FEE_COLLECTION' | 'OPERATIONAL_EXPENSE' | 'ADJUSTMENT';
+  reference: string | null;
+  notes: string | null;
+  created_at: string;
+  created_by_admin_id: string | null;
+}
+
+export const useCompanyUsdcBalance = () => {
+  return useQuery({
+    queryKey: ['company-usdc-balance'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('company_usdc_balance')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      return data as CompanyUsdcBalance;
+    },
+    refetchInterval: 30000,
+  });
+};
+
+export const useCompanyUsdcLedger = () => {
+  return useQuery({
+    queryKey: ['company-usdc-ledger'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('company_usdc_ledger')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data as CompanyUsdcLedgerEntry[];
+    },
+  });
+};
+
+export const useUpdateCompanyUsdcBalance = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ 
+      amount, 
+      type,
+      reference,
+      notes 
+    }: { 
+      amount: number;
+      type: 'DEPOSIT' | 'WITHDRAWAL' | 'FEE_COLLECTION' | 'OPERATIONAL_EXPENSE' | 'ADJUSTMENT';
+      reference?: string;
+      notes?: string;
+    }) => {
+      const { data: user } = await supabase.auth.getUser();
+
+      // Get current balance
+      const { data: currentBalance, error: balanceError } = await supabase
+        .from('company_usdc_balance')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (balanceError) throw balanceError;
+
+      // Calculate new balance
+      const isDebit = ['WITHDRAWAL', 'OPERATIONAL_EXPENSE'].includes(type);
+      const newBalance = isDebit 
+        ? Number(currentBalance.balance_usdc) - Math.abs(amount)
+        : Number(currentBalance.balance_usdc) + Math.abs(amount);
+
+      // Update balance
+      const { error: updateError } = await supabase
+        .from('company_usdc_balance')
+        .update({ 
+          balance_usdc: newBalance, 
+          last_updated_at: new Date().toISOString(),
+          updated_by_admin_id: user.user?.id 
+        })
+        .eq('id', currentBalance.id);
+
+      if (updateError) throw updateError;
+
+      // Record ledger entry
+      const { data: ledgerEntry, error: ledgerError } = await supabase
+        .from('company_usdc_ledger')
+        .insert({
+          amount_usdc: isDebit ? -Math.abs(amount) : Math.abs(amount),
+          type,
+          reference,
+          notes,
+          created_by_admin_id: user.user?.id,
+        })
+        .select()
+        .single();
+
+      if (ledgerError) throw ledgerError;
+      return ledgerEntry;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['company-usdc-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['company-usdc-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['treasury-overview'] });
+      toast({ title: 'Company USDC balance updated' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error updating balance', description: error.message, variant: 'destructive' });
+    },
+  });
+};
+
+// =====================================================
 // Combined Treasury Stats
 // =====================================================
 
@@ -308,6 +435,13 @@ export const useTreasuryOverview = () => {
       // Get USDC stats
       const { data: usdcStats } = await supabase.rpc('get_usdc_inventory_stats');
       const usdc = Array.isArray(usdcStats) ? usdcStats[0] : usdcStats;
+
+      // Get company USDC balance
+      const { data: companyUsdc } = await supabase
+        .from('company_usdc_balance')
+        .select('balance_usdc')
+        .limit(1)
+        .single();
 
       // Get pending cashouts
       const { count: pendingCashouts } = await supabase
@@ -325,6 +459,7 @@ export const useTreasuryOverview = () => {
           total: Number(usdc?.total_usdc || 0),
           available: Number(usdc?.available_usdc || 0),
         },
+        companyUsdc: Number(companyUsdc?.balance_usdc || 0),
         pendingCashouts: pendingCashouts || 0,
       };
     },
