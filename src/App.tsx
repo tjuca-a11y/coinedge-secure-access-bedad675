@@ -8,6 +8,7 @@ import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { SalesRepAuthProvider } from "@/contexts/SalesRepAuthContext";
 import { MerchantAuthProvider } from "@/contexts/MerchantAuthContext";
 import { DynamicProvider } from "@/providers/DynamicProvider";
+import { DynamicWalletProvider } from "@/contexts/DynamicWalletContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminProtectedRoute } from "@/components/admin/AdminProtectedRoute";
 import { SalesRepProtectedRoute } from "@/components/sales-rep/SalesRepProtectedRoute";
@@ -137,19 +138,21 @@ const App = () => (
             {/* Customer Routes */}
             <Route path="/*" element={
               <AuthProvider>
-                <Routes>
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<SignUp />} />
-                  <Route path="/kyc" element={<Kyc />} />
-                  <Route path="/" element={<ProtectedRoute><Navigate to="/activity" replace /></ProtectedRoute>} />
-                  <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
-                  <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-                  <Route path="/send" element={<ProtectedRoute><SendRequest /></ProtectedRoute>} />
-                  <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                  <Route path="/settings/identity-verification" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
-                  <Route path="/redeem" element={<ProtectedRoute><Redeem /></ProtectedRoute>} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
+                <DynamicWalletProvider>
+                  <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/signup" element={<SignUp />} />
+                    <Route path="/kyc" element={<Kyc />} />
+                    <Route path="/" element={<ProtectedRoute><Navigate to="/activity" replace /></ProtectedRoute>} />
+                    <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+                    <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
+                    <Route path="/send" element={<ProtectedRoute><SendRequest /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    <Route path="/settings/identity-verification" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
+                    <Route path="/redeem" element={<ProtectedRoute><Redeem /></ProtectedRoute>} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </DynamicWalletProvider>
               </AuthProvider>
             } />
           </Routes>

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useDynamicContext, useUserWallets, useAuthenticateConnectedUser, getAuthToken } from '@dynamic-labs/sdk-react-core';
+import { useDynamicContext, useUserWallets, getAuthToken } from '@dynamic-labs/sdk-react-core';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useDynamicConfigured } from '@/providers/DynamicProvider';
 
 interface WalletInfo {
   address: string;
@@ -18,9 +19,10 @@ interface DynamicWalletContextType {
   // Connection state
   isConnected: boolean;
   isLoading: boolean;
+  isConfigured: boolean;
   
   // User state from Dynamic
-  dynamicUser: ReturnType<typeof useDynamicContext>['user'];
+  dynamicUser: any;
   
   // Actions
   connectWallet: () => void;
@@ -36,7 +38,26 @@ interface DynamicWalletContextType {
 
 const DynamicWalletContext = createContext<DynamicWalletContextType | undefined>(undefined);
 
-export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Default/fallback context values when Dynamic is not configured
+const defaultContextValue: DynamicWalletContextType = {
+  wallets: [],
+  btcWallet: null,
+  ethWallet: null,
+  isConnected: false,
+  isLoading: false,
+  isConfigured: false,
+  dynamicUser: null,
+  connectWallet: () => console.warn('Dynamic SDK not configured'),
+  disconnectWallet: async () => console.warn('Dynamic SDK not configured'),
+  signMessage: async () => null,
+  syncWalletToProfile: async () => console.warn('Dynamic SDK not configured'),
+  btcBalance: 0,
+  usdcBalance: 0,
+  refreshBalances: async () => {},
+};
+
+// Internal provider that uses Dynamic hooks (only rendered when Dynamic is configured)
+const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { 
     user: dynamicUser, 
     primaryWallet, 
@@ -45,7 +66,6 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
   } = useDynamicContext();
   
   const userWallets = useUserWallets();
-  const { authenticateUser } = useAuthenticateConnectedUser();
   
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [btcBalance, setBtcBalance] = useState(0);
@@ -241,6 +261,7 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
         ethWallet,
         isConnected,
         isLoading,
+        isConfigured: true,
         dynamicUser,
         connectWallet,
         disconnectWallet,
@@ -254,6 +275,23 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
       {children}
     </DynamicWalletContext.Provider>
   );
+};
+
+// Main provider that switches between internal (with Dynamic) and fallback (without)
+export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isConfigured = useDynamicConfigured();
+
+  if (!isConfigured) {
+    // Provide default context when Dynamic is not configured
+    return (
+      <DynamicWalletContext.Provider value={defaultContextValue}>
+        {children}
+      </DynamicWalletContext.Provider>
+    );
+  }
+
+  // Use the internal provider that has access to Dynamic hooks
+  return <DynamicWalletProviderInternal>{children}</DynamicWalletProviderInternal>;
 };
 
 export const useDynamicWallet = () => {
