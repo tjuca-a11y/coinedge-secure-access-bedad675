@@ -47,7 +47,7 @@ const currentBtcPrice = 93327.91;
 // Network fee estimates
 const NETWORK_FEES = {
   BTC: 0.00005, // ~$5 at current prices
-  USDC: 0.01, // $0.01 on Solana
+  USDC: 2.50, // ~$2.50 on Ethereum
 };
 
 // Address validation schemas
@@ -56,18 +56,18 @@ const btcAddressSchema = z.string().regex(
   "Invalid Bitcoin address"
 );
 
-const usdcAddressSchema = z.string().regex(
-  /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
-  "Invalid Solana address"
+const ethAddressSchema = z.string().regex(
+  /^0x[a-fA-F0-9]{40}$/,
+  "Invalid Ethereum address"
 );
 
 const emailSchema = z.string().email("Invalid email address");
 
 // Helper to detect address type
-const detectAddressType = (input: string): "btc" | "usdc" | "email" | "unknown" => {
+const detectAddressType = (input: string): "btc" | "eth" | "email" | "unknown" => {
   if (emailSchema.safeParse(input).success) return "email";
   if (btcAddressSchema.safeParse(input).success) return "btc";
-  if (usdcAddressSchema.safeParse(input).success) return "usdc";
+  if (ethAddressSchema.safeParse(input).success) return "eth";
   return "unknown";
 };
 
@@ -91,7 +91,7 @@ const SendRequest: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [addressValidation, setAddressValidation] = useState<{
     isValid: boolean;
-    type: "btc" | "usdc" | "email" | "unknown";
+    type: "btc" | "eth" | "email" | "unknown";
     message?: string;
   } | null>(null);
 
@@ -169,14 +169,15 @@ const SendRequest: React.FC = () => {
       } else {
         setAddressValidation({ isValid: true, type, message: "Valid Bitcoin address" });
       }
-    } else if (type === "usdc") {
+    } else if (type === "eth") {
       if (currency !== "USDC") {
         setAddressValidation({ 
           isValid: false, 
           type, 
-          message: "This is a Solana address. Switch to USDC to send." 
+          message: "This is an Ethereum address. Switch to USDC to send." 
         });
       } else {
+        setAddressValidation({ isValid: true, type, message: "Valid Ethereum address" });
         setAddressValidation({ isValid: true, type, message: "Valid Solana address" });
       }
     } else if (input.length > 10) {
@@ -315,8 +316,8 @@ const SendRequest: React.FC = () => {
       return;
     }
     
-    if (type === "usdc" && currency !== "USDC") {
-      toast.error("This is a Solana address. Please switch to USDC to send.");
+    if (type === "eth" && currency !== "USDC") {
+      toast.error("This is an Ethereum address. Please switch to USDC to send.");
       return;
     }
 
@@ -326,7 +327,7 @@ const SendRequest: React.FC = () => {
       address: type !== "email" ? sendRecipient : undefined,
       email: type === "email" ? sendRecipient : undefined,
       initials: type === "email" ? sendRecipient.slice(0, 2).toUpperCase() : currency.slice(0, 2),
-      color: type === "btc" ? "bg-btc" : type === "usdc" ? "bg-usdc" : "bg-muted"
+      color: type === "btc" ? "bg-btc" : type === "eth" ? "bg-usdc" : "bg-muted"
     });
     setSendStep("confirm");
   };
