@@ -136,7 +136,6 @@ const AdminFulfillmentQueue: React.FC = () => {
     await updateOrder.mutateAsync({
       id: order.id,
       updates: { status: 'HOLD', blocked_reason: reason },
-      action: 'hold',
     });
   };
 
@@ -150,7 +149,6 @@ const AdminFulfillmentQueue: React.FC = () => {
     await updateOrder.mutateAsync({
       id: order.id,
       updates: { status: nextStatus, blocked_reason: null },
-      action: 'release',
     });
   };
 
@@ -158,7 +156,6 @@ const AdminFulfillmentQueue: React.FC = () => {
     await updateOrder.mutateAsync({
       id: order.id,
       updates: { status: 'READY_TO_SEND' },
-      action: 'retry',
     });
   };
 
@@ -375,7 +372,6 @@ const AdminFulfillmentQueue: React.FC = () => {
                                       updateOrder.mutateAsync({
                                         id: order.id,
                                         updates: { status: 'SENDING' },
-                                        action: 'manual_send_initiated',
                                       });
                                     }}
                                   >

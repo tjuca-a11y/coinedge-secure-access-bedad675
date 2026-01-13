@@ -588,7 +588,7 @@ const AdminSystemControls: React.FC = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {transfer.fireblocks_transfer_id?.slice(0, 12) || '—'}
+                        {transfer.tx_hash?.slice(0, 12) || '—'}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {transfer.tx_hash ? (
