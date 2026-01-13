@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+import { useDynamicAuth } from '@/hooks/useDynamicAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,16 +13,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireKyc = false,
 }) => {
   const { user, loading, isKycApproved } = useAuth();
-  const { user: dynamicUser, sdkHasLoaded } = useDynamicContext();
+  const { user: dynamicUser, isConfigured: isDynamicConfigured } = useDynamicAuth();
   const location = useLocation();
 
-  // Wait for both auth systems to load
-  const isLoading = loading || !sdkHasLoaded;
-  
   // User is authenticated if they have either Supabase OR Dynamic session
   const isAuthenticated = !!user || !!dynamicUser;
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
