@@ -11,6 +11,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dynamic-labs/bitcoin": "^4.52.5",
+    "@dynamic-labs/ethereum": "^4.52.5",
+    "@dynamic-labs/sdk-react-core": "^4.52.5",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
