@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useDynamicContext, useUserWallets, getAuthToken } from '@dynamic-labs/sdk-react-core';
+import { useDynamicContext, useUserWallets, getAuthToken, useEmbeddedWallet } from '@dynamic-labs/sdk-react-core';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useDynamicConfigured } from '@/providers/DynamicProvider';
@@ -20,12 +20,13 @@ interface DynamicWalletContextType {
   isConnected: boolean;
   isLoading: boolean;
   isConfigured: boolean;
+  isWalletInitializing: boolean;
   
   // User state from Dynamic
   dynamicUser: any;
+  isAuthenticated: boolean;
   
   // Actions
-  connectWallet: () => void;
   disconnectWallet: () => Promise<void>;
   signMessage: (message: string, chain: 'BTC' | 'ETH') => Promise<string | null>;
   syncWalletToProfile: () => Promise<void>;
@@ -46,8 +47,9 @@ const defaultContextValue: DynamicWalletContextType = {
   isConnected: false,
   isLoading: false,
   isConfigured: false,
+  isWalletInitializing: false,
   dynamicUser: null,
-  connectWallet: () => console.warn('Dynamic SDK not configured'),
+  isAuthenticated: false,
   disconnectWallet: async () => console.warn('Dynamic SDK not configured'),
   signMessage: async () => null,
   syncWalletToProfile: async () => console.warn('Dynamic SDK not configured'),
@@ -61,19 +63,40 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
   const { 
     user: dynamicUser, 
     primaryWallet, 
-    setShowAuthFlow, 
     handleLogOut,
+    sdkHasLoaded,
   } = useDynamicContext();
   
   const userWallets = useUserWallets();
+  const { createEmbeddedWallet, userHasEmbeddedWallet } = useEmbeddedWallet();
   
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [btcBalance, setBtcBalance] = useState(0);
   const [usdcBalance, setUsdcBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isWalletInitializing, setIsWalletInitializing] = useState(false);
   
   // Derive isAuthenticated from user presence
   const isAuthenticated = !!dynamicUser;
+
+  // Auto-create embedded wallet when user authenticates
+  useEffect(() => {
+    const createWallet = async () => {
+      if (dynamicUser && sdkHasLoaded && !userHasEmbeddedWallet) {
+        setIsWalletInitializing(true);
+        try {
+          await createEmbeddedWallet();
+          console.log('Embedded wallet created automatically');
+        } catch (e) {
+          console.error('Failed to create embedded wallet:', e);
+        } finally {
+          setIsWalletInitializing(false);
+        }
+      }
+    };
+    
+    createWallet();
+  }, [dynamicUser, sdkHasLoaded, userHasEmbeddedWallet, createEmbeddedWallet]);
 
   // Parse wallets from Dynamic
   useEffect(() => {
@@ -84,6 +107,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
         publicKey: wallet.address,
       }));
       setWallets(parsedWallets);
+      setIsWalletInitializing(false);
     } else {
       setWallets([]);
     }
@@ -92,6 +116,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
   // Derived wallet getters
   const btcWallet = wallets.find(w => w.chain === 'BTC') || null;
   const ethWallet = wallets.find(w => w.chain === 'ETH') || null;
+  // User is connected if authenticated AND has wallets (or wallet is initializing)
   const isConnected = isAuthenticated && wallets.length > 0;
 
   // Sync Dynamic auth to Supabase (creates/updates user profile)
@@ -133,11 +158,6 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
     syncToSupabase();
   }, [dynamicUser, wallets]);
 
-  // Connect wallet - triggers Dynamic modal
-  const connectWallet = useCallback(() => {
-    setShowAuthFlow(true);
-  }, [setShowAuthFlow]);
-
   // Disconnect wallet
   const disconnectWallet = useCallback(async () => {
     try {
@@ -146,10 +166,10 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
       setWallets([]);
       setBtcBalance(0);
       setUsdcBalance(0);
-      toast.success('Wallet disconnected');
+      toast.success('Signed out successfully');
     } catch (error) {
-      console.error('Error disconnecting wallet:', error);
-      toast.error('Failed to disconnect wallet');
+      console.error('Error signing out:', error);
+      toast.error('Failed to sign out');
     }
   }, [handleLogOut]);
 
@@ -158,7 +178,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
     const wallet = chain === 'BTC' ? btcWallet : ethWallet;
     
     if (!wallet || !primaryWallet) {
-      toast.error('No wallet connected for signing');
+      toast.error('No wallet available for signing');
       return null;
     }
 
@@ -205,10 +225,8 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
         .eq('user_id', user.id);
 
       if (error) throw error;
-      toast.success('Wallet synced to profile');
     } catch (error) {
       console.error('Error syncing wallet to profile:', error);
-      toast.error('Failed to sync wallet');
     }
   }, [btcWallet, ethWallet]);
 
@@ -262,8 +280,9 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
         isConnected,
         isLoading,
         isConfigured: true,
+        isWalletInitializing,
         dynamicUser,
-        connectWallet,
+        isAuthenticated,
         disconnectWallet,
         signMessage,
         syncWalletToProfile,

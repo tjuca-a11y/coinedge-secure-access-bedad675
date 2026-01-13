@@ -39,6 +39,9 @@ export const DynamicProvider: React.FC<DynamicProviderProps> = ({ children }) =>
           ],
           appName: 'CoinEdge',
           appLogoUrl: '/favicon.ico',
+          // Email-first authentication with automatic embedded wallet
+          initialAuthenticationMode: 'connect-and-sign',
+          // Wallet creation happens automatically after email auth
           events: {
             onAuthSuccess: (args) => {
               console.log('Dynamic auth success:', args.user?.userId);

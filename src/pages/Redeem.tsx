@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { useCoinEdgeTransfer } from "@/hooks/useCoinEdgeTransfer";
-import { Gift, Bitcoin, DollarSign, CheckCircle, AlertCircle, Loader2, Shield, Wallet } from "lucide-react";
+import { Gift, Bitcoin, DollarSign, CheckCircle, AlertCircle, Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 type RedeemStatus = "idle" | "validating" | "redeeming" | "success" | "error";
@@ -21,7 +21,7 @@ interface VoucherResult {
 
 const Redeem: React.FC = () => {
   const { isKycApproved, profile } = useAuth();
-  const { isConnected, btcWallet, ethWallet, connectWallet } = useDynamicWallet();
+  const { isConnected, btcWallet, ethWallet, isWalletInitializing } = useDynamicWallet();
   const { validateVoucher, executeTransfer, getQuote, isLoading } = useCoinEdgeTransfer();
   
   const [voucherCode, setVoucherCode] = useState("");
@@ -41,7 +41,7 @@ const Redeem: React.FC = () => {
     }
 
     if (!isConnected) {
-      toast.error("Please connect your wallet first");
+      toast.error("Wallet is still loading. Please wait.");
       return;
     }
 
@@ -119,23 +119,18 @@ const Redeem: React.FC = () => {
   return (
     <DashboardLayout title="Redeem Voucher" subtitle="Enter your voucher code to receive crypto">
       <div className="max-w-xl mx-auto">
-        {/* Wallet connection card */}
-        {!isConnected && (
-          <Card className="mb-4 border-amber-500/50 bg-amber-500/5">
+        {/* Wallet loading notice */}
+        {isWalletInitializing && (
+          <Card className="mb-4 border-blue-500/50 bg-blue-500/5">
             <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-500/10 rounded-full">
-                    <Wallet className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Connect Your Wallet</p>
-                    <p className="text-sm text-muted-foreground">
-                      Connect to receive funds to your self-custody wallet
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                <div>
+                  <p className="font-medium text-foreground">Loading your wallet...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Please wait while your wallet is being prepared.
+                  </p>
                 </div>
-                <Button onClick={connectWallet}>Connect</Button>
               </div>
             </CardContent>
           </Card>
@@ -250,7 +245,7 @@ const Redeem: React.FC = () => {
                     <Button 
                       onClick={handleValidate}
                       className="flex-1 gap-2" 
-                      disabled={status === "validating" || !voucherCode.trim() || !isConnected || isLoading}
+                      disabled={status === "validating" || !voucherCode.trim() || !isConnected || isLoading || isWalletInitializing}
                     >
                       {status === "validating" || isLoading ? (
                         <>
