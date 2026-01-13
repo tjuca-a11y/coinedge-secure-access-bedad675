@@ -116,8 +116,8 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
   // Derived wallet getters
   const btcWallet = wallets.find(w => w.chain === 'BTC') || null;
   const ethWallet = wallets.find(w => w.chain === 'ETH') || null;
-  // User is connected if authenticated AND has wallets (or wallet is initializing)
-  const isConnected = isAuthenticated && wallets.length > 0;
+  // User is connected if authenticated (wallet will auto-create)
+  const isConnected = isAuthenticated;
 
   // Sync Dynamic auth to Supabase (creates/updates user profile)
   useEffect(() => {

@@ -48,7 +48,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   usdcBalance,
 }) => {
   const { user, isKycApproved } = useAuth();
-  const { isConnected, btcWallet, signMessage } = useDynamicWallet();
+  const { isConnected, btcWallet, signMessage, isWalletInitializing } = useDynamicWallet();
   const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
   
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
@@ -108,8 +108,8 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
       return;
     }
 
-    if (!isConnected || !btcWallet) {
-      toast.error("Please connect your wallet first");
+    if (!btcWallet) {
+      toast.error("Wallet is still initializing, please wait...");
       return;
     }
 
@@ -206,12 +206,12 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
         {/* KYC Banner if not approved */}
         {!isKycApproved && <KycBanner />}
 
-        {/* Wallet not connected warning */}
-        {isKycApproved && !isConnected && (
-          <Card className="p-3 border-amber-500/50 bg-amber-500/5 mb-4">
-            <div className="flex items-center gap-2 text-amber-600 text-sm">
-              <Wallet className="h-4 w-4" />
-              Connect your wallet to trade
+        {/* Wallet initializing notice */}
+        {isKycApproved && isWalletInitializing && (
+          <Card className="p-3 border-primary/50 bg-primary/5 mb-4">
+            <div className="flex items-center gap-2 text-primary text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Setting up your wallet...
             </div>
           </Card>
         )}
@@ -359,7 +359,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
               disabled={
                 isLoading || 
                 !amount || 
-                !isConnected ||
+                isWalletInitializing ||
                 (paymentMethod === "usdc_wallet" && totalCost > usdcBalance) ||
                 (paymentMethod === "plaid_bank" && !isPlaidConnected)
               }
@@ -451,7 +451,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
 
             <Button
               onClick={showQuote ? handleSubmit : handleGetQuote}
-              disabled={isLoading || !amount || !isConnected || btcToSell > btcBalance}
+              disabled={isLoading || !amount || isWalletInitializing || btcToSell > btcBalance}
               className="w-full"
               variant="destructive"
             >
