@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
-import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink, TrendingUp, TrendingDown, Minus, Building2, Wallet as WalletIcon, Shield } from "lucide-react";
+import { Send, Download, Gift, Bitcoin, DollarSign, Copy, TrendingUp, TrendingDown, Minus, Building2, Shield, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -55,9 +55,9 @@ const Wallet: React.FC = () => {
     ethWallet, 
     btcBalance, 
     usdcBalance, 
-    connectWallet, 
     refreshBalances,
-    isLoading: walletLoading 
+    isLoading: walletLoading,
+    isWalletInitializing 
   } = useDynamicWallet();
   
   const navigate = useNavigate();
@@ -92,6 +92,27 @@ const Wallet: React.FC = () => {
   const btcAddress = btcWallet?.address || profile?.btc_address;
   const usdcAddress = ethWallet?.address || profile?.usdc_address;
 
+  // Show wallet initialization loading state
+  if (isWalletInitializing) {
+    return (
+      <DashboardLayout title="Wallet" subtitle="Setting up your wallet...">
+        <div className="flex items-center justify-center py-20">
+          <Card className="w-full max-w-md">
+            <CardContent className="py-12">
+              <div className="text-center">
+                <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
+                <h3 className="text-lg font-semibold mb-2">Loading your wallet...</h3>
+                <p className="text-muted-foreground text-sm">
+                  Preparing your secure self-custody wallet.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout title="Wallet" subtitle="Manage your self-custody Bitcoin and USDC">
       <div ref={containerRef}>
@@ -99,30 +120,6 @@ const Wallet: React.FC = () => {
           pullDistance={pullDistance} 
           isRefreshing={isRefreshing} 
         />
-
-        {/* Wallet Connection Status */}
-        {!isConnected && isKycApproved && (
-          <Card className="mb-4 border-amber-500/50 bg-amber-500/5">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-500/10 rounded-full">
-                    <WalletIcon className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Connect Your Wallet</p>
-                    <p className="text-sm text-muted-foreground">
-                      Connect to access your self-custody wallet
-                    </p>
-                  </div>
-                </div>
-                <Button onClick={connectWallet} disabled={walletLoading}>
-                  {walletLoading ? "Connecting..." : "Connect"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Portfolio Value Card */}
         <Card className="mb-4 md:mb-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
@@ -220,7 +217,7 @@ const Wallet: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
           <Button 
-            disabled={!isKycApproved || !isConnected} 
+            disabled={!isKycApproved} 
             className="gap-2 flex-1 sm:flex-none text-sm"
             onClick={() => navigate("/send")}
           >
@@ -229,7 +226,7 @@ const Wallet: React.FC = () => {
           </Button>
           <Button 
             variant="outline" 
-            disabled={!isKycApproved || !isConnected} 
+            disabled={!isKycApproved} 
             className="gap-2 flex-1 sm:flex-none text-sm"
             onClick={() => setReceiveModalOpen(true)}
           >
@@ -237,7 +234,7 @@ const Wallet: React.FC = () => {
             Receive
           </Button>
           <Button 
-            disabled={!isKycApproved || !isConnected} 
+            disabled={!isKycApproved} 
             className="gap-2 bg-accent hover:bg-accent/90 flex-1 sm:flex-none text-sm"
             onClick={() => navigate("/redeem")}
           >
@@ -246,7 +243,7 @@ const Wallet: React.FC = () => {
           </Button>
           <Button 
             variant="secondary"
-            disabled={!isKycApproved || !isConnected} 
+            disabled={!isKycApproved} 
             className="gap-2 flex-1 sm:flex-none text-sm"
             onClick={() => setCashOutModalOpen(true)}
           >
@@ -258,8 +255,8 @@ const Wallet: React.FC = () => {
         {/* Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
           <Card 
-            className={isKycApproved && isConnected ? "cursor-pointer transition-all hover:border-btc/50 hover:shadow-md" : ""}
-            onClick={() => isKycApproved && isConnected && setBuySellModalOpen(true)}
+            className={isKycApproved ? "cursor-pointer transition-all hover:border-btc/50 hover:shadow-md" : ""}
+            onClick={() => isKycApproved && setBuySellModalOpen(true)}
           >
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
@@ -270,13 +267,13 @@ const Wallet: React.FC = () => {
                   <CardTitle className="text-lg">Bitcoin</CardTitle>
                   <p className="text-sm text-muted-foreground">BTC</p>
                 </div>
-                {isKycApproved && isConnected && (
+                {isKycApproved && (
                   <span className="text-xs text-muted-foreground">Tap to manage</span>
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              {isKycApproved && isConnected ? (
+              {isKycApproved ? (
                 <>
                   <p className="text-2xl md:text-3xl font-bold mb-1">{btcBalance.toFixed(8)} BTC</p>
                   <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${(btcBalance * currentBtcPrice).toFixed(2)}</p>
@@ -300,17 +297,15 @@ const Wallet: React.FC = () => {
                     </div>
                   )}
                 </>
-              ) : !isKycApproved ? (
-                <p className="text-muted-foreground">Complete KYC to view your BTC wallet</p>
               ) : (
-                <p className="text-muted-foreground">Connect wallet to view your BTC balance</p>
+                <p className="text-muted-foreground">Complete KYC to view your BTC wallet</p>
               )}
             </CardContent>
           </Card>
 
           <Card 
-            className={isKycApproved && isConnected ? "cursor-pointer transition-all hover:border-usdc/50 hover:shadow-md" : ""}
-            onClick={() => isKycApproved && isConnected && setUsdcActionsModalOpen(true)}
+            className={isKycApproved ? "cursor-pointer transition-all hover:border-usdc/50 hover:shadow-md" : ""}
+            onClick={() => isKycApproved && setUsdcActionsModalOpen(true)}
           >
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
@@ -321,13 +316,13 @@ const Wallet: React.FC = () => {
                   <CardTitle className="text-lg">USD Coin</CardTitle>
                   <p className="text-sm text-muted-foreground">USDC</p>
                 </div>
-                {isKycApproved && isConnected && (
+                {isKycApproved && (
                   <span className="text-xs text-muted-foreground">Tap to manage</span>
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              {isKycApproved && isConnected ? (
+              {isKycApproved ? (
                 <>
                   <p className="text-2xl md:text-3xl font-bold mb-1">{usdcBalance.toFixed(2)} USDC</p>
                   <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${usdcBalance.toFixed(2)}</p>
@@ -351,10 +346,8 @@ const Wallet: React.FC = () => {
                     </div>
                   )}
                 </>
-              ) : !isKycApproved ? (
-                <p className="text-muted-foreground">Complete KYC to view your USDC wallet</p>
               ) : (
-                <p className="text-muted-foreground">Connect wallet to view your USDC balance</p>
+                <p className="text-muted-foreground">Complete KYC to view your USDC wallet</p>
               )}
             </CardContent>
           </Card>
@@ -379,7 +372,7 @@ const Wallet: React.FC = () => {
                 <div>
                   <p className="font-medium text-foreground">Self-Custody Wallet</p>
                   <p className="text-sm text-muted-foreground">
-                    You control your private keys. CoinEdge is only a counterparty for trades — we cannot access or move your funds. Your wallet is powered by Dynamic.
+                    You control your private keys. CoinEdge is only a counterparty for trades — we cannot access or move your funds.
                   </p>
                 </div>
               </div>

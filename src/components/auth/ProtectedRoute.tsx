@@ -1,7 +1,9 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDynamicAuth } from '@/hooks/useDynamicAuth';
+import { useDynamicWallet } from '@/contexts/DynamicWalletContext';
+import { Loader2, Wallet } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,11 +15,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireKyc = false,
 }) => {
   const { user, loading, isKycApproved } = useAuth();
-  const { user: dynamicUser, isConfigured: isDynamicConfigured } = useDynamicAuth();
+  const { isAuthenticated, isWalletInitializing, isConfigured } = useDynamicWallet();
   const location = useLocation();
 
   // User is authenticated if they have either Supabase OR Dynamic session
-  const isAuthenticated = !!user || !!dynamicUser;
+  const isLoggedIn = !!user || isAuthenticated;
 
   if (loading) {
     return (
@@ -30,8 +32,30 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isLoggedIn) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Show wallet initialization state for Dynamic users
+  if (isConfigured && isAuthenticated && isWalletInitializing) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="py-12">
+            <div className="text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-6">
+                <Wallet className="h-8 w-8 text-primary animate-pulse" />
+              </div>
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+              <h3 className="text-lg font-semibold mb-2">Loading your wallet...</h3>
+              <p className="text-muted-foreground text-sm">
+                Preparing your secure self-custody wallet.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Only redirect to KYC if explicitly required (e.g., for redemption)
