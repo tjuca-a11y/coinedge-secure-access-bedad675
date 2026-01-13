@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DynamicWidget, useDynamicContext } from '@dynamic-labs/sdk-react-core';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Wallet, Shield, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { Shield, ChevronDown, ChevronUp, Zap, UserPlus } from 'lucide-react';
 import { SignUpForm } from './SignUpForm';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Link } from 'react-router-dom';
@@ -21,11 +21,11 @@ export const DynamicSignUpForm: React.FC<DynamicSignUpFormProps> = ({
     <Card className="w-full max-w-md">
       <CardHeader className="text-center space-y-2">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Wallet className="h-8 w-8 text-primary" />
+          <UserPlus className="h-8 w-8 text-primary" />
         </div>
-        <CardTitle className="text-2xl font-bold">Create Your Wallet</CardTitle>
+        <CardTitle className="text-2xl font-bold">Create Your CoinEdge Account</CardTitle>
         <CardDescription>
-          Get your self-custodial Bitcoin & USDC wallet in seconds
+          Buy, sell, and hold Bitcoin & USDC
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -33,21 +33,21 @@ export const DynamicSignUpForm: React.FC<DynamicSignUpFormProps> = ({
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-2.5">
             <Shield className="h-4 w-4 text-primary flex-shrink-0" />
-            <span className="text-xs font-medium">Self-Custodial</span>
+            <span className="text-xs font-medium">Secure Wallet</span>
           </div>
           <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-2.5">
             <Zap className="h-4 w-4 text-primary flex-shrink-0" />
-            <span className="text-xs font-medium">Instant Setup</span>
+            <span className="text-xs font-medium">Instant Access</span>
           </div>
         </div>
 
-        {/* Dynamic Wallet Connect */}
+        {/* Dynamic Account Creation */}
         <div className="space-y-4">
           <DynamicWidget
             innerButtonComponent={
               <Button className="w-full h-12 text-base" size="lg">
-                <Wallet className="mr-2 h-5 w-5" />
-                Create Wallet
+                <UserPlus className="mr-2 h-5 w-5" />
+                Create Account
               </Button>
             }
           />
@@ -60,7 +60,7 @@ export const DynamicSignUpForm: React.FC<DynamicSignUpFormProps> = ({
                 Your keys, your crypto
               </p>
               <p className="text-xs text-muted-foreground">
-                We never have access to your private keys. You maintain full control over your assets.
+                Your CoinEdge account includes a secure wallet. We never have access to your private keys.
               </p>
             </div>
           </div>
@@ -105,7 +105,7 @@ export const DynamicSignUpForm: React.FC<DynamicSignUpFormProps> = ({
 
         {/* Login link */}
         <p className="text-center text-sm text-muted-foreground">
-          Already have a wallet?{' '}
+          Already have an account?{' '}
           <Link to="/login" className="font-medium text-primary hover:underline">
             Sign in
           </Link>
