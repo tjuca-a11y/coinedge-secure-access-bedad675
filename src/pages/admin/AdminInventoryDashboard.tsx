@@ -32,6 +32,7 @@ import {
   Wallet,
   Plus,
   Clock,
+  Shield,
 } from 'lucide-react';
 import {
   useTreasuryWallet,
@@ -55,8 +56,6 @@ const AdminInventoryDashboard: React.FC = () => {
 
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [walletForm, setWalletForm] = useState({
-    fireblocks_vault_id: '',
-    fireblocks_wallet_id: '',
     btc_address: '',
     label: 'CoinEdge Treasury',
   });
@@ -105,7 +104,7 @@ const AdminInventoryDashboard: React.FC = () => {
   const previewLots = lots?.slice(0, 5) || [];
 
   return (
-    <AdminLayout title="BTC Inventory" subtitle="Treasury wallet and inventory health overview">
+    <AdminLayout title="BTC Inventory" subtitle="CoinEdge wallet and inventory health overview">
       {/* Alerts */}
       <div className="space-y-3 mb-6">
         {payoutsPaused && (
@@ -143,10 +142,16 @@ const AdminInventoryDashboard: React.FC = () => {
       {/* Treasury Wallet */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5" />
-            Treasury Wallet
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              CoinEdge Wallet
+            </CardTitle>
+            <Badge variant="outline" className="gap-1">
+              <Shield className="h-3 w-3" />
+              Self-Custody Model
+            </Badge>
+          </div>
           {!wallet && (
             <Dialog open={walletDialogOpen} onOpenChange={setWalletDialogOpen}>
               <DialogTrigger asChild>
@@ -157,35 +162,22 @@ const AdminInventoryDashboard: React.FC = () => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Configure Treasury Wallet</DialogTitle>
+                  <DialogTitle>Configure CoinEdge Wallet</DialogTitle>
                   <DialogDescription>
-                    Set up the Fireblocks treasury wallet for BTC inventory.
+                    Set up the CoinEdge counterparty wallet for BTC inventory.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label>Fireblocks Vault ID *</Label>
-                    <Input
-                      value={walletForm.fireblocks_vault_id}
-                      onChange={(e) => setWalletForm({ ...walletForm, fireblocks_vault_id: e.target.value })}
-                      placeholder="Enter vault ID"
-                    />
-                  </div>
-                  <div>
-                    <Label>Fireblocks Wallet ID</Label>
-                    <Input
-                      value={walletForm.fireblocks_wallet_id}
-                      onChange={(e) => setWalletForm({ ...walletForm, fireblocks_wallet_id: e.target.value })}
-                      placeholder="Enter wallet ID (optional)"
-                    />
-                  </div>
-                  <div>
-                    <Label>BTC Address (Display)</Label>
+                    <Label>BTC Address</Label>
                     <Input
                       value={walletForm.btc_address}
                       onChange={(e) => setWalletForm({ ...walletForm, btc_address: e.target.value })}
-                      placeholder="bc1q... (optional)"
+                      placeholder="bc1q..."
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      CoinEdge counterparty address for customer transactions
+                    </p>
                   </div>
                   <div>
                     <Label>Label</Label>
@@ -201,7 +193,7 @@ const AdminInventoryDashboard: React.FC = () => {
                   </Button>
                   <Button 
                     onClick={handleCreateWallet} 
-                    disabled={!walletForm.fireblocks_vault_id || createWallet.isPending}
+                    disabled={createWallet.isPending}
                   >
                     {createWallet.isPending ? 'Creating...' : 'Create Wallet'}
                   </Button>
@@ -216,14 +208,10 @@ const AdminInventoryDashboard: React.FC = () => {
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : wallet ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Label</p>
                 <p className="font-medium">{wallet.label}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Vault ID</p>
-                <p className="font-mono text-sm">{wallet.fireblocks_vault_id}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">BTC Address</p>
@@ -239,7 +227,7 @@ const AdminInventoryDashboard: React.FC = () => {
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground">No treasury wallet configured. Click "Configure Wallet" to set up.</p>
+            <p className="text-muted-foreground">No CoinEdge wallet configured. Click "Configure Wallet" to set up.</p>
           )}
         </CardContent>
       </Card>

@@ -4,7 +4,8 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink, TrendingUp, TrendingDown, Minus, Building2 } from "lucide-react";
+import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
+import { Send, Download, Gift, Bitcoin, DollarSign, Copy, ExternalLink, TrendingUp, TrendingDown, Minus, Building2, Wallet as WalletIcon, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -15,6 +16,8 @@ import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
 import { CashOutModal } from "@/components/wallet/CashOutModal";
 import { CashOutHistory } from "@/components/wallet/CashOutHistory";
 import { ReceiveModal } from "@/components/wallet/ReceiveModal";
+import { Badge } from "@/components/ui/badge";
+
 // Mock account performance data with more realistic values for demo
 const accountPerformanceData = [
   { date: "Jan 4", value: 0 },
@@ -44,12 +47,19 @@ const calculatePerformance = (data: typeof accountPerformanceData) => {
 // Mock current BTC price
 const currentBtcPrice = 93327.91;
 
-// Mock balances (in real app, fetch from backend)
-const mockBtcBalance = 0;
-const mockUsdcBalance = 0;
-
 const Wallet: React.FC = () => {
   const { profile, isKycApproved } = useAuth();
+  const { 
+    isConnected, 
+    btcWallet, 
+    ethWallet, 
+    btcBalance, 
+    usdcBalance, 
+    connectWallet, 
+    refreshBalances,
+    isLoading: walletLoading 
+  } = useDynamicWallet();
+  
   const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [buySellModalOpen, setBuySellModalOpen] = useState(false);
@@ -58,11 +68,10 @@ const Wallet: React.FC = () => {
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
 
   const handleRefresh = useCallback(async () => {
-    // Simulate refresh delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await refreshBalances();
     setLastRefresh(Date.now());
     toast.success("Wallet refreshed");
-  }, []);
+  }, [refreshBalances]);
 
   const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -70,7 +79,7 @@ const Wallet: React.FC = () => {
 
   // Calculate performance metrics
   const performance = calculatePerformance(accountPerformanceData);
-  const totalBalance = (mockBtcBalance * currentBtcPrice) + mockUsdcBalance;
+  const totalBalance = (btcBalance * currentBtcPrice) + usdcBalance;
 
   const copyAddress = (address: string | null | undefined, asset: string) => {
     if (address) {
@@ -79,21 +88,59 @@ const Wallet: React.FC = () => {
     }
   };
 
+  // Use Dynamic wallet addresses if connected, fallback to profile
+  const btcAddress = btcWallet?.address || profile?.btc_address;
+  const usdcAddress = ethWallet?.address || profile?.usdc_address;
+
   return (
-    <DashboardLayout title="Wallet" subtitle="Manage your Bitcoin and USDC balances">
+    <DashboardLayout title="Wallet" subtitle="Manage your self-custody Bitcoin and USDC">
       <div ref={containerRef}>
         <PullToRefreshIndicator 
           pullDistance={pullDistance} 
           isRefreshing={isRefreshing} 
         />
 
+        {/* Wallet Connection Status */}
+        {!isConnected && isKycApproved && (
+          <Card className="mb-4 border-amber-500/50 bg-amber-500/5">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/10 rounded-full">
+                    <WalletIcon className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Connect Your Wallet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Connect to access your self-custody wallet
+                    </p>
+                  </div>
+                </div>
+                <Button onClick={connectWallet} disabled={walletLoading}>
+                  {walletLoading ? "Connecting..." : "Connect"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Portfolio Value Card */}
         <Card className="mb-4 md:mb-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
           <CardContent className="py-6">
-            <p className="text-sm text-muted-foreground mb-1">Portfolio Value</p>
-            <p className="text-3xl md:text-4xl font-bold">${totalBalance.toFixed(2)}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-sm text-muted-foreground">≈ {mockUsdcBalance.toFixed(2)} USDC + {mockBtcBalance.toFixed(8)} BTC</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Portfolio Value</p>
+                <p className="text-3xl md:text-4xl font-bold">${totalBalance.toFixed(2)}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-muted-foreground">≈ {usdcBalance.toFixed(2)} USDC + {btcBalance.toFixed(8)} BTC</p>
+                </div>
+              </div>
+              {isConnected && (
+                <Badge variant="outline" className="gap-1 text-green-600 border-green-600/50">
+                  <Shield className="h-3 w-3" />
+                  Self-Custody
+                </Badge>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -173,7 +220,7 @@ const Wallet: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
           <Button 
-            disabled={!isKycApproved} 
+            disabled={!isKycApproved || !isConnected} 
             className="gap-2 flex-1 sm:flex-none text-sm"
             onClick={() => navigate("/send")}
           >
@@ -182,7 +229,7 @@ const Wallet: React.FC = () => {
           </Button>
           <Button 
             variant="outline" 
-            disabled={!isKycApproved} 
+            disabled={!isKycApproved || !isConnected} 
             className="gap-2 flex-1 sm:flex-none text-sm"
             onClick={() => setReceiveModalOpen(true)}
           >
@@ -190,7 +237,7 @@ const Wallet: React.FC = () => {
             Receive
           </Button>
           <Button 
-            disabled={!isKycApproved} 
+            disabled={!isKycApproved || !isConnected} 
             className="gap-2 bg-accent hover:bg-accent/90 flex-1 sm:flex-none text-sm"
             onClick={() => navigate("/redeem")}
           >
@@ -199,7 +246,7 @@ const Wallet: React.FC = () => {
           </Button>
           <Button 
             variant="secondary"
-            disabled={!isKycApproved} 
+            disabled={!isKycApproved || !isConnected} 
             className="gap-2 flex-1 sm:flex-none text-sm"
             onClick={() => setCashOutModalOpen(true)}
           >
@@ -211,8 +258,8 @@ const Wallet: React.FC = () => {
         {/* Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
           <Card 
-            className={isKycApproved ? "cursor-pointer transition-all hover:border-btc/50 hover:shadow-md" : ""}
-            onClick={() => isKycApproved && setBuySellModalOpen(true)}
+            className={isKycApproved && isConnected ? "cursor-pointer transition-all hover:border-btc/50 hover:shadow-md" : ""}
+            onClick={() => isKycApproved && isConnected && setBuySellModalOpen(true)}
           >
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
@@ -223,28 +270,28 @@ const Wallet: React.FC = () => {
                   <CardTitle className="text-lg">Bitcoin</CardTitle>
                   <p className="text-sm text-muted-foreground">BTC</p>
                 </div>
-                {isKycApproved && (
+                {isKycApproved && isConnected && (
                   <span className="text-xs text-muted-foreground">Tap to manage</span>
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              {isKycApproved ? (
+              {isKycApproved && isConnected ? (
                 <>
-                  <p className="text-2xl md:text-3xl font-bold mb-1">{mockBtcBalance.toFixed(8)} BTC</p>
-                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${(mockBtcBalance * currentBtcPrice).toFixed(2)}</p>
-                  {profile?.btc_address && (
+                  <p className="text-2xl md:text-3xl font-bold mb-1">{btcBalance.toFixed(8)} BTC</p>
+                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${(btcBalance * currentBtcPrice).toFixed(2)}</p>
+                  {btcAddress && (
                     <div className="p-3 bg-muted rounded-lg" onClick={(e) => e.stopPropagation()}>
-                      <p className="text-xs text-muted-foreground mb-1">Wallet Address</p>
+                      <p className="text-xs text-muted-foreground mb-1">Your Self-Custody Address</p>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs flex-1 truncate">{profile.btc_address}</code>
+                        <code className="text-xs flex-1 truncate">{btcAddress}</code>
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8"
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyAddress(profile.btc_address, "BTC");
+                            copyAddress(btcAddress, "BTC");
                           }}
                         >
                           <Copy className="h-4 w-4" />
@@ -253,15 +300,17 @@ const Wallet: React.FC = () => {
                     </div>
                   )}
                 </>
-              ) : (
+              ) : !isKycApproved ? (
                 <p className="text-muted-foreground">Complete KYC to view your BTC wallet</p>
+              ) : (
+                <p className="text-muted-foreground">Connect wallet to view your BTC balance</p>
               )}
             </CardContent>
           </Card>
 
           <Card 
-            className={isKycApproved ? "cursor-pointer transition-all hover:border-usdc/50 hover:shadow-md" : ""}
-            onClick={() => isKycApproved && setUsdcActionsModalOpen(true)}
+            className={isKycApproved && isConnected ? "cursor-pointer transition-all hover:border-usdc/50 hover:shadow-md" : ""}
+            onClick={() => isKycApproved && isConnected && setUsdcActionsModalOpen(true)}
           >
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
@@ -272,28 +321,28 @@ const Wallet: React.FC = () => {
                   <CardTitle className="text-lg">USD Coin</CardTitle>
                   <p className="text-sm text-muted-foreground">USDC</p>
                 </div>
-                {isKycApproved && (
+                {isKycApproved && isConnected && (
                   <span className="text-xs text-muted-foreground">Tap to manage</span>
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              {isKycApproved ? (
+              {isKycApproved && isConnected ? (
                 <>
-                  <p className="text-2xl md:text-3xl font-bold mb-1">{mockUsdcBalance.toFixed(2)} USDC</p>
-                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${mockUsdcBalance.toFixed(2)}</p>
-                  {profile?.usdc_address && (
+                  <p className="text-2xl md:text-3xl font-bold mb-1">{usdcBalance.toFixed(2)} USDC</p>
+                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">≈ ${usdcBalance.toFixed(2)}</p>
+                  {usdcAddress && (
                     <div className="p-3 bg-muted rounded-lg" onClick={(e) => e.stopPropagation()}>
-                      <p className="text-xs text-muted-foreground mb-1">Wallet Address</p>
+                      <p className="text-xs text-muted-foreground mb-1">Your Self-Custody Address</p>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs flex-1 truncate">{profile.usdc_address}</code>
+                        <code className="text-xs flex-1 truncate">{usdcAddress}</code>
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8"
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyAddress(profile.usdc_address, "USDC");
+                            copyAddress(usdcAddress, "USDC");
                           }}
                         >
                           <Copy className="h-4 w-4" />
@@ -302,8 +351,10 @@ const Wallet: React.FC = () => {
                     </div>
                   )}
                 </>
-              ) : (
+              ) : !isKycApproved ? (
                 <p className="text-muted-foreground">Complete KYC to view your USDC wallet</p>
+              ) : (
+                <p className="text-muted-foreground">Connect wallet to view your USDC balance</p>
               )}
             </CardContent>
           </Card>
@@ -318,17 +369,17 @@ const Wallet: React.FC = () => {
         )}
 
         {/* Self-custody Notice */}
-        {isKycApproved && (
+        {isKycApproved && isConnected && (
           <Card className="bg-primary/5 border-primary/20">
             <CardContent className="py-4">
               <div className="flex items-start gap-3">
                 <div className="p-2 bg-primary/10 rounded-full">
-                  <ExternalLink className="h-5 w-5 text-primary" />
+                  <Shield className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Self-Custody Wallet</p>
                   <p className="text-sm text-muted-foreground">
-                    You control your private keys. CoinEdge cannot access or move your funds.
+                    You control your private keys. CoinEdge is only a counterparty for trades — we cannot access or move your funds. Your wallet is powered by Dynamic.
                   </p>
                 </div>
               </div>
@@ -341,23 +392,23 @@ const Wallet: React.FC = () => {
           open={buySellModalOpen}
           onOpenChange={setBuySellModalOpen}
           currentBtcPrice={currentBtcPrice}
-          btcBalance={mockBtcBalance}
-          usdcBalance={mockUsdcBalance}
+          btcBalance={btcBalance}
+          usdcBalance={usdcBalance}
         />
 
         {/* USDC Actions Modal */}
         <UsdcActionsModal
           open={usdcActionsModalOpen}
           onOpenChange={setUsdcActionsModalOpen}
-          usdcBalance={mockUsdcBalance}
+          usdcBalance={usdcBalance}
         />
 
         {/* Cash Out Modal */}
         <CashOutModal
           open={cashOutModalOpen}
           onOpenChange={setCashOutModalOpen}
-          btcBalance={mockBtcBalance}
-          usdcBalance={mockUsdcBalance}
+          btcBalance={btcBalance}
+          usdcBalance={usdcBalance}
           currentBtcPrice={currentBtcPrice}
         />
 
@@ -365,8 +416,8 @@ const Wallet: React.FC = () => {
         <ReceiveModal
           open={receiveModalOpen}
           onOpenChange={setReceiveModalOpen}
-          btcAddress={profile?.btc_address}
-          usdcAddress={profile?.usdc_address}
+          btcAddress={btcAddress}
+          usdcAddress={usdcAddress}
         />
       </div>
     </DashboardLayout>

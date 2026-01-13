@@ -21,8 +21,6 @@ verify_jwt = false
 [functions.create-all-demo-accounts]
 verify_jwt = false
 
-[functions.fireblocks-transfer]
-verify_jwt = false
 
 [functions.plaid-link]
 verify_jwt = false

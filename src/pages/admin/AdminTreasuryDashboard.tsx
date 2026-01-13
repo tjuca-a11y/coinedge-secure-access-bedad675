@@ -45,6 +45,7 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
+  Shield,
 } from 'lucide-react';
 import {
   useTreasuryWallet,
@@ -63,6 +64,7 @@ import {
   useCompanyUsdcBalance,
   useCompanyUsdcLedger,
   useUpdateCompanyUsdcBalance,
+  TreasuryWallet,
 } from '@/hooks/useTreasury';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -91,8 +93,6 @@ const AdminTreasuryDashboard: React.FC = () => {
   const [usdcLotDialogOpen, setUsdcLotDialogOpen] = useState(false);
   const [companyUsdcDialogOpen, setCompanyUsdcDialogOpen] = useState(false);
   const [walletForm, setWalletForm] = useState({
-    fireblocks_vault_id: '',
-    fireblocks_wallet_id: '',
     btc_address: '',
     usdc_address: '',
     label: 'CoinEdge Treasury',
@@ -183,7 +183,7 @@ const AdminTreasuryDashboard: React.FC = () => {
   const pendingCashouts = cashoutOrders?.filter(o => ['PENDING', 'PROCESSING', 'ACH_INITIATED'].includes(o.status)) || [];
 
   return (
-    <AdminLayout title="Treasury Dashboard" subtitle="Unified BTC & USDC inventory management">
+    <AdminLayout title="Treasury Dashboard" subtitle="CoinEdge wallet and inventory management">
       {/* Alerts */}
       <div className="space-y-3 mb-6">
         {(btcPayoutsPaused || usdcPayoutsPaused) && (
@@ -228,9 +228,9 @@ const AdminTreasuryDashboard: React.FC = () => {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5" />
-              Treasury Wallet (Fireblocks)
+              CoinEdge Wallet
             </CardTitle>
-            <CardDescription>BTC & USDC (ERC-20 on Ethereum) inventory</CardDescription>
+            <CardDescription>Counterparty wallet for customer transactions</CardDescription>
           </div>
           {!wallet && (
             <Dialog open={walletDialogOpen} onOpenChange={setWalletDialogOpen}>
@@ -242,20 +242,12 @@ const AdminTreasuryDashboard: React.FC = () => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Configure Treasury Wallet</DialogTitle>
+                  <DialogTitle>Configure CoinEdge Wallet</DialogTitle>
                   <DialogDescription>
-                    Set up the Fireblocks vault for BTC and USDC inventory.
+                    Set up the CoinEdge counterparty wallet addresses.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div>
-                    <Label>Fireblocks Vault ID *</Label>
-                    <Input
-                      value={walletForm.fireblocks_vault_id}
-                      onChange={(e) => setWalletForm({ ...walletForm, fireblocks_vault_id: e.target.value })}
-                      placeholder="Enter vault ID"
-                    />
-                  </div>
                   <div>
                     <Label>BTC Address</Label>
                     <Input
@@ -263,6 +255,9 @@ const AdminTreasuryDashboard: React.FC = () => {
                       onChange={(e) => setWalletForm({ ...walletForm, btc_address: e.target.value })}
                       placeholder="bc1q..."
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Address for receiving BTC from customer sells
+                    </p>
                   </div>
                   <div>
                     <Label>USDC Address (Ethereum)</Label>
@@ -271,6 +266,9 @@ const AdminTreasuryDashboard: React.FC = () => {
                       onChange={(e) => setWalletForm({ ...walletForm, usdc_address: e.target.value })}
                       placeholder="0x..."
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Address for receiving USDC from customer cashouts
+                    </p>
                   </div>
                   <div>
                     <Label>Label</Label>
@@ -286,7 +284,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                   </Button>
                   <Button 
                     onClick={handleCreateWallet} 
-                    disabled={!walletForm.fireblocks_vault_id || createWallet.isPending}
+                    disabled={createWallet.isPending}
                   >
                     {createWallet.isPending ? 'Creating...' : 'Create Wallet'}
                   </Button>
@@ -301,14 +299,10 @@ const AdminTreasuryDashboard: React.FC = () => {
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : wallet ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Label</p>
                 <p className="font-medium">{wallet.label}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Vault ID</p>
-                <p className="font-mono text-sm">{wallet.fireblocks_vault_id}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">BTC Address</p>
@@ -320,7 +314,7 @@ const AdminTreasuryDashboard: React.FC = () => {
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground">No treasury wallet configured.</p>
+            <p className="text-muted-foreground">No CoinEdge wallet configured.</p>
           )}
         </CardContent>
       </Card>
@@ -389,18 +383,18 @@ const AdminTreasuryDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Integration Status</CardTitle>
-            <Settings className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Wallet Model</CardTitle>
+            <Shield className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span>Fireblocks</span>
-                <Badge variant="secondary">Not Configured</Badge>
+                <span>Customer Wallets</span>
+                <Badge variant="default">Dynamic</Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span>Plaid ACH</span>
-                <Badge variant="secondary">Not Configured</Badge>
+                <span>Counterparty</span>
+                <Badge variant="default">CoinEdge</Badge>
               </div>
             </div>
           </CardContent>
@@ -438,7 +432,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                   <DialogHeader>
                     <DialogTitle>Add USDC Inventory</DialogTitle>
                     <DialogDescription>
-                      Record USDC added to the treasury wallet.
+                      Record USDC added to the CoinEdge wallet.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
@@ -446,23 +440,24 @@ const AdminTreasuryDashboard: React.FC = () => {
                       <Label>Amount (USDC) *</Label>
                       <Input
                         type="number"
+                        step="0.01"
                         value={usdcLotForm.amount}
                         onChange={(e) => setUsdcLotForm({ ...usdcLotForm, amount: e.target.value })}
-                        placeholder="10000"
+                        placeholder="0.00"
                       />
                     </div>
                     <div>
                       <Label>Source</Label>
                       <Select
                         value={usdcLotForm.source}
-                        onValueChange={(value) => setUsdcLotForm({ ...usdcLotForm, source: value as typeof usdcLotForm.source })}
+                        onValueChange={(v) => setUsdcLotForm({ ...usdcLotForm, source: v as typeof usdcLotForm.source })}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="manual_topup">Manual Top-up</SelectItem>
-                          <SelectItem value="user_sell">User Sell (BTC → USDC)</SelectItem>
+                          <SelectItem value="user_sell">User Sell</SelectItem>
                           <SelectItem value="exchange_withdraw">Exchange Withdraw</SelectItem>
                           <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
@@ -473,7 +468,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                       <Input
                         value={usdcLotForm.reference_id}
                         onChange={(e) => setUsdcLotForm({ ...usdcLotForm, reference_id: e.target.value })}
-                        placeholder="TX hash or order ID"
+                        placeholder="Optional"
                       />
                     </div>
                     <div>
@@ -481,7 +476,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                       <Input
                         value={usdcLotForm.notes}
                         onChange={(e) => setUsdcLotForm({ ...usdcLotForm, notes: e.target.value })}
-                        placeholder="Optional notes"
+                        placeholder="Optional"
                       />
                     </div>
                   </div>
@@ -504,7 +499,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Lot ID</TableHead>
+                      <TableHead>ID</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Available</TableHead>
                       <TableHead>Source</TableHead>
@@ -528,9 +523,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                   </TableBody>
                 </Table>
               ) : (
-                <div className="py-8 text-center text-muted-foreground">
-                  No USDC inventory lots. Click "Add USDC" to record inventory.
-                </div>
+                <p className="text-muted-foreground text-center py-8">No USDC inventory lots.</p>
               )}
             </CardContent>
           </Card>
@@ -540,29 +533,26 @@ const AdminTreasuryDashboard: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Company USDC</CardTitle>
-                <CardDescription>Operational funds separate from customer inventory</CardDescription>
+                <CardTitle>Company USDC Balance</CardTitle>
+                <CardDescription>Operational funds for fees and expenses</CardDescription>
               </div>
               <Dialog open={companyUsdcDialogOpen} onOpenChange={setCompanyUsdcDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-1" />
-                    Add Transaction
+                    Record Transaction
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Company USDC Transaction</DialogTitle>
-                    <DialogDescription>
-                      Record deposits, withdrawals, or adjustments to company funds.
-                    </DialogDescription>
+                    <DialogTitle>Record Company USDC Transaction</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label>Type *</Label>
+                      <Label>Transaction Type</Label>
                       <Select
                         value={companyUsdcForm.type}
-                        onValueChange={(value) => setCompanyUsdcForm({ ...companyUsdcForm, type: value as typeof companyUsdcForm.type })}
+                        onValueChange={(v) => setCompanyUsdcForm({ ...companyUsdcForm, type: v as typeof companyUsdcForm.type })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -580,9 +570,10 @@ const AdminTreasuryDashboard: React.FC = () => {
                       <Label>Amount (USDC) *</Label>
                       <Input
                         type="number"
+                        step="0.01"
                         value={companyUsdcForm.amount}
                         onChange={(e) => setCompanyUsdcForm({ ...companyUsdcForm, amount: e.target.value })}
-                        placeholder="1000"
+                        placeholder="0.00"
                       />
                     </div>
                     <div>
@@ -590,7 +581,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                       <Input
                         value={companyUsdcForm.reference}
                         onChange={(e) => setCompanyUsdcForm({ ...companyUsdcForm, reference: e.target.value })}
-                        placeholder="TX hash or invoice #"
+                        placeholder="Optional"
                       />
                     </div>
                     <div>
@@ -598,7 +589,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                       <Input
                         value={companyUsdcForm.notes}
                         onChange={(e) => setCompanyUsdcForm({ ...companyUsdcForm, notes: e.target.value })}
-                        placeholder="Optional notes"
+                        placeholder="Optional"
                       />
                     </div>
                   </div>
@@ -610,66 +601,36 @@ const AdminTreasuryDashboard: React.FC = () => {
                       onClick={handleCompanyUsdcTransaction} 
                       disabled={!companyUsdcForm.amount || updateCompanyUsdc.isPending}
                     >
-                      {updateCompanyUsdc.isPending ? 'Processing...' : 'Submit'}
+                      {updateCompanyUsdc.isPending ? 'Recording...' : 'Record'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <Card className="border-purple-500/20 bg-purple-500/5">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-purple-600 font-medium">Current Balance</p>
-                    <p className="text-3xl font-bold text-purple-600">
-                      {formatUsdc(Number(companyUsdc?.balance_usdc || 0))}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Last updated: {companyUsdc?.last_updated_at 
-                        ? formatDistanceToNow(new Date(companyUsdc.last_updated_at), { addSuffix: true })
-                        : 'Never'}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-muted-foreground font-medium">Recent Activity</p>
-                    <p className="text-3xl font-bold">{companyLedger?.length || 0}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Total transactions</p>
-                  </CardContent>
-                </Card>
+              <div className="text-3xl font-bold mb-4">
+                {formatUsdc(Number(companyUsdc?.balance_usdc || 0))}
               </div>
-
-              {companyLedger && companyLedger.length > 0 ? (
+              {companyLedger && companyLedger.length > 0 && (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Type</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Reference</TableHead>
-                      <TableHead>Notes</TableHead>
                       <TableHead>Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {companyLedger.slice(0, 15).map((entry) => (
+                    {companyLedger.slice(0, 10).map((entry) => (
                       <TableRow key={entry.id}>
                         <TableCell>
-                          <Badge 
-                            variant={['WITHDRAWAL', 'OPERATIONAL_EXPENSE'].includes(entry.type) ? 'destructive' : 'default'}
-                          >
-                            {entry.type.replace('_', ' ')}
-                          </Badge>
+                          <Badge variant="outline">{entry.type.replace('_', ' ')}</Badge>
                         </TableCell>
-                        <TableCell className={Number(entry.amount_usdc) < 0 ? 'text-red-600' : 'text-green-600'}>
-                          {Number(entry.amount_usdc) >= 0 ? '+' : ''}{formatUsdc(Number(entry.amount_usdc))}
+                        <TableCell className={entry.amount_usdc < 0 ? 'text-destructive' : 'text-green-600'}>
+                          {entry.amount_usdc > 0 ? '+' : ''}{formatUsdc(entry.amount_usdc)}
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {entry.reference || '—'}
-                        </TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">
-                          {entry.notes || '—'}
-                        </TableCell>
+                        <TableCell className="text-sm">{entry.reference || '—'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
                         </TableCell>
@@ -677,10 +638,6 @@ const AdminTreasuryDashboard: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
-              ) : (
-                <div className="py-8 text-center text-muted-foreground">
-                  No company USDC transactions yet. Click "Add Transaction" to record activity.
-                </div>
               )}
             </CardContent>
           </Card>
@@ -689,8 +646,8 @@ const AdminTreasuryDashboard: React.FC = () => {
         <TabsContent value="cashouts">
           <Card>
             <CardHeader>
-              <CardTitle>Cash-out Orders (ACH)</CardTitle>
-              <CardDescription>Users selling BTC/USDC for USD to their bank accounts</CardDescription>
+              <CardTitle>Cash-out Orders</CardTitle>
+              <CardDescription>Customer requests to withdraw to bank accounts</CardDescription>
             </CardHeader>
             <CardContent>
               {cashoutLoading ? (
@@ -702,11 +659,10 @@ const AdminTreasuryDashboard: React.FC = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Order ID</TableHead>
-                      <TableHead>Asset</TableHead>
-                      <TableHead>USD Amount</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Amount</TableHead>
                       <TableHead>Fee</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Est. Arrival</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -719,19 +675,16 @@ const AdminTreasuryDashboard: React.FC = () => {
                           <Badge variant="outline">{order.source_asset}</Badge>
                         </TableCell>
                         <TableCell>{formatCurrency(Number(order.usd_amount))}</TableCell>
-                        <TableCell className="text-muted-foreground">{formatCurrency(Number(order.fee_usd))}</TableCell>
+                        <TableCell>{formatCurrency(Number(order.fee_usd))}</TableCell>
                         <TableCell>{getCashoutStatusBadge(order.status)}</TableCell>
-                        <TableCell className="text-sm">
-                          {order.estimated_arrival ? format(new Date(order.estimated_arrival), 'MMM d') : '—'}
-                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
                         </TableCell>
                         <TableCell>
                           {order.status === 'PENDING' && (
                             <div className="flex gap-1">
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 onClick={() => handleCashoutAction(order.id, 'process')}
                               >
@@ -741,15 +694,15 @@ const AdminTreasuryDashboard: React.FC = () => {
                           )}
                           {order.status === 'PROCESSING' && (
                             <div className="flex gap-1">
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="default"
                                 onClick={() => handleCashoutAction(order.id, 'complete')}
                               >
                                 Complete
                               </Button>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="destructive"
                                 onClick={() => handleCashoutAction(order.id, 'fail')}
                               >
@@ -763,9 +716,7 @@ const AdminTreasuryDashboard: React.FC = () => {
                   </TableBody>
                 </Table>
               ) : (
-                <div className="py-8 text-center text-muted-foreground">
-                  No cash-out orders yet.
-                </div>
+                <p className="text-muted-foreground text-center py-8">No cash-out orders.</p>
               )}
             </CardContent>
           </Card>
@@ -774,9 +725,5 @@ const AdminTreasuryDashboard: React.FC = () => {
     </AdminLayout>
   );
 };
-
-interface TreasuryWallet {
-  usdc_address?: string;
-}
 
 export default AdminTreasuryDashboard;
