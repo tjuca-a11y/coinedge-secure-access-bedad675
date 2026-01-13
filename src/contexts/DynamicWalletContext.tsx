@@ -315,8 +315,10 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useDynamicWallet = () => {
   const context = useContext(DynamicWalletContext);
+  // Return default values if context is undefined (e.g., during HMR or outside provider)
   if (context === undefined) {
-    throw new Error('useDynamicWallet must be used within a DynamicWalletProvider');
+    console.warn('useDynamicWallet called outside DynamicWalletProvider, returning defaults');
+    return defaultContextValue;
   }
   return context;
 };
