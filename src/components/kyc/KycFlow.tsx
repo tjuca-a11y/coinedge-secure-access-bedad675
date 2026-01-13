@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle2, Clock, XCircle, Shield, User, CreditCard, Loader2 } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Shield, User, CreditCard, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 type KycStep = 'personal' | 'identity' | 'bank' | 'status';
@@ -20,11 +20,13 @@ export const KycFlow: React.FC = () => {
     error,
     plaidLinkToken,
     identityVerificationId,
+    cooldownInfo,
     submitPersonalInfo,
     createIdentityVerificationToken,
     handleVerificationComplete,
     simulateKycApproval,
     clearPlaidTokens,
+    initiateRetry,
   } = useKyc();
   const { openPlaidLink: openBankLink, isLoading: isBankLinkLoading } = usePlaidLink();
   const navigate = useNavigate();
@@ -50,6 +52,41 @@ export const KycFlow: React.FC = () => {
 
   const [isPlaidIdentityOpen, setIsPlaidIdentityOpen] = useState(false);
   const [verificationStarted, setVerificationStarted] = useState(false);
+  const [cooldownTimeLeft, setCooldownTimeLeft] = useState<string>('');
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (!cooldownInfo.isInCooldown) {
+      setCooldownTimeLeft('');
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = new Date();
+      const remaining = cooldownInfo.retryAvailableAt!.getTime() - now.getTime();
+      
+      if (remaining <= 0) {
+        setCooldownTimeLeft('');
+        return;
+      }
+
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+
+      if (hours > 0) {
+        setCooldownTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      } else if (minutes > 0) {
+        setCooldownTimeLeft(`${minutes}m ${seconds}s`);
+      } else {
+        setCooldownTimeLeft(`${seconds}s`);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownInfo.isInCooldown, cooldownInfo.retryAvailableAt]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -71,6 +108,23 @@ export const KycFlow: React.FC = () => {
         toast.info('Plaid not configured. Using demo verification mode.');
         setStep('identity');
       }
+    } else if (error) {
+      toast.error(error);
+    }
+  };
+
+  // Handle retry KYC
+  const handleRetryKyc = async () => {
+    if (cooldownInfo.isInCooldown) {
+      toast.error(`Please wait ${cooldownTimeLeft} before retrying`);
+      return;
+    }
+
+    const success = await initiateRetry();
+    if (success) {
+      setVerificationStarted(false);
+      setStep('personal');
+      toast.success('You can now start a new verification attempt');
     } else if (error) {
       toast.error(error);
     }
@@ -520,21 +574,59 @@ export const KycFlow: React.FC = () => {
     }
 
     if (kycStatus === 'rejected') {
+      const isInCooldown = cooldownInfo.isInCooldown;
+      
       return (
         <div className="text-center space-y-6">
           <XCircle className="w-16 h-16 mx-auto text-destructive" />
           <div>
             <h2 className="text-2xl font-bold text-foreground">Verification Failed</h2>
             <p className="text-muted-foreground mt-2">
-              {profile?.kyc_rejection_reason || 'Your verification could not be completed. Please contact support.'}
+              {profile?.kyc_rejection_reason || 'Your verification could not be completed.'}
             </p>
           </div>
-          <Button variant="outline" onClick={() => {
-            setVerificationStarted(false);
-            setStep('personal');
-          }}>
-            Try Again
+
+          {/* Cooldown notice */}
+          {isInCooldown && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <div className="flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400">
+                <Clock className="w-5 h-5" />
+                <span className="font-medium">Retry available in: {cooldownTimeLeft}</span>
+              </div>
+              <p className="text-amber-600 dark:text-amber-500 text-sm mt-2">
+                For security purposes, there's a waiting period before you can attempt verification again.
+              </p>
+            </div>
+          )}
+
+          {/* Retry button */}
+          <Button 
+            variant="outline" 
+            onClick={handleRetryKyc}
+            disabled={isInCooldown || loading}
+            className="gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Processing...
+              </>
+            ) : isInCooldown ? (
+              <>
+                <Clock className="w-4 h-4" />
+                Retry Locked
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Try Again
+              </>
+            )}
           </Button>
+
+          <p className="text-xs text-muted-foreground">
+            If you believe this is an error, please contact support for assistance.
+          </p>
         </div>
       );
     }
