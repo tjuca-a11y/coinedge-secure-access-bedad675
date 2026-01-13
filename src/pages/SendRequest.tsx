@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronDown, Delete, X, ArrowLeft, Link2, ScanLine, Search } from "lucide-react";
+import { ChevronDown, Delete, X, ArrowLeft, Link2, ScanLine, Search, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { z } from "zod";
 
 type RequestStep = "closed" | "description" | "recipient" | "confirm" | "scanner";
 type SendStep = "closed" | "recipient" | "confirm" | "scanner";
@@ -35,13 +36,45 @@ const recentContacts: Contact[] = [
   { id: "1", name: "Alex Johnson", email: "alex@email.com", initials: "AJ", color: "bg-blue-500" },
   { id: "2", name: "Sarah Miller", email: "sarah@email.com", initials: "SM", color: "bg-purple-500" },
   { id: "3", name: "Mike Chen", email: "mike@email.com", initials: "MC", color: "bg-green-500" },
-  { id: "4", name: "Emma Wilson", address: "0x1234...5678", initials: "EW", color: "bg-orange-500" },
+  { id: "4", name: "Emma Wilson", address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", initials: "EW", color: "bg-orange-500" },
 ];
+
+// Mock balances (in real app, fetch from backend)
+const mockBtcBalance = 0.05;
+const mockUsdcBalance = 500;
+const currentBtcPrice = 93327.91;
+
+// Network fee estimates
+const NETWORK_FEES = {
+  BTC: 0.00005, // ~$5 at current prices
+  USDC: 0.01, // $0.01 on Solana
+};
+
+// Address validation schemas
+const btcAddressSchema = z.string().regex(
+  /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/,
+  "Invalid Bitcoin address"
+);
+
+const usdcAddressSchema = z.string().regex(
+  /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
+  "Invalid Solana address"
+);
+
+const emailSchema = z.string().email("Invalid email address");
+
+// Helper to detect address type
+const detectAddressType = (input: string): "btc" | "usdc" | "email" | "unknown" => {
+  if (emailSchema.safeParse(input).success) return "email";
+  if (btcAddressSchema.safeParse(input).success) return "btc";
+  if (usdcAddressSchema.safeParse(input).success) return "usdc";
+  return "unknown";
+};
 
 const SendRequest: React.FC = () => {
   const { isKycApproved } = useAuth();
   const [amount, setAmount] = useState("0");
-  const [currency, setCurrency] = useState("USDC");
+  const [currency, setCurrency] = useState<"USDC" | "BTC">("USDC");
   
   // Request flow state
   const [requestStep, setRequestStep] = useState<RequestStep>("closed");
@@ -55,6 +88,12 @@ const SendRequest: React.FC = () => {
   const [sendRecipient, setSendRecipient] = useState("");
   const [selectedSendContact, setSelectedSendContact] = useState<Contact | null>(null);
   const [sendSearchQuery, setSendSearchQuery] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [addressValidation, setAddressValidation] = useState<{
+    isValid: boolean;
+    type: "btc" | "usdc" | "email" | "unknown";
+    message?: string;
+  } | null>(null);
 
   const handleNumberPress = (num: string) => {
     if (!isKycApproved) {
@@ -82,6 +121,75 @@ const SendRequest: React.FC = () => {
     }
   };
 
+  // Calculate available balance based on currency
+  const availableBalance = useMemo(() => {
+    return currency === "BTC" ? mockBtcBalance : mockUsdcBalance;
+  }, [currency]);
+
+  // Calculate USD value of amount
+  const amountUsd = useMemo(() => {
+    const numAmount = parseFloat(amount) || 0;
+    return currency === "BTC" ? numAmount * currentBtcPrice : numAmount;
+  }, [amount, currency]);
+
+  // Network fee in selected currency
+  const networkFee = useMemo(() => {
+    return NETWORK_FEES[currency];
+  }, [currency]);
+
+  // Total amount including fee
+  const totalAmount = useMemo(() => {
+    const numAmount = parseFloat(amount) || 0;
+    return numAmount + networkFee;
+  }, [amount, networkFee]);
+
+  // Check if user has sufficient balance
+  const hasSufficientBalance = useMemo(() => {
+    return totalAmount <= availableBalance;
+  }, [totalAmount, availableBalance]);
+
+  // Validate address when it changes
+  const validateAddress = (input: string) => {
+    if (!input.trim()) {
+      setAddressValidation(null);
+      return;
+    }
+
+    const type = detectAddressType(input);
+    
+    if (type === "email") {
+      setAddressValidation({ isValid: true, type, message: "Valid email address" });
+    } else if (type === "btc") {
+      if (currency !== "BTC") {
+        setAddressValidation({ 
+          isValid: false, 
+          type, 
+          message: "This is a BTC address. Switch to BTC to send." 
+        });
+      } else {
+        setAddressValidation({ isValid: true, type, message: "Valid Bitcoin address" });
+      }
+    } else if (type === "usdc") {
+      if (currency !== "USDC") {
+        setAddressValidation({ 
+          isValid: false, 
+          type, 
+          message: "This is a Solana address. Switch to USDC to send." 
+        });
+      } else {
+        setAddressValidation({ isValid: true, type, message: "Valid Solana address" });
+      }
+    } else if (input.length > 10) {
+      setAddressValidation({ 
+        isValid: false, 
+        type: "unknown", 
+        message: "Invalid address format" 
+      });
+    } else {
+      setAddressValidation(null);
+    }
+  };
+
   const handleSend = () => {
     if (!isKycApproved) {
       toast.error("Complete KYC to send funds");
@@ -89,6 +197,11 @@ const SendRequest: React.FC = () => {
     }
     if (amount === "0" || amount === "") {
       toast.error("Enter an amount");
+      return;
+    }
+    const numAmount = parseFloat(amount);
+    if (numAmount + networkFee > availableBalance) {
+      toast.error(`Insufficient ${currency} balance (including network fee)`);
       return;
     }
     setSendStep("recipient");
@@ -179,6 +292,7 @@ const SendRequest: React.FC = () => {
   // Send handlers
   const handleSelectSendContact = (contact: Contact) => {
     setSelectedSendContact(contact);
+    setAddressValidation({ isValid: true, type: "email", message: "Sending to contact" });
     setSendStep("confirm");
   };
 
@@ -187,19 +301,68 @@ const SendRequest: React.FC = () => {
       toast.error("Enter a recipient address or email");
       return;
     }
+    
+    // Validate the address
+    const type = detectAddressType(sendRecipient);
+    
+    if (type === "unknown") {
+      toast.error("Please enter a valid wallet address or email");
+      return;
+    }
+    
+    if (type === "btc" && currency !== "BTC") {
+      toast.error("This is a BTC address. Please switch to BTC to send.");
+      return;
+    }
+    
+    if (type === "usdc" && currency !== "USDC") {
+      toast.error("This is a Solana address. Please switch to USDC to send.");
+      return;
+    }
+
     setSelectedSendContact({ 
       id: "manual", 
-      name: sendRecipient, 
-      initials: sendRecipient.slice(0, 2).toUpperCase(), 
-      color: "bg-muted" 
+      name: type === "email" ? sendRecipient : `${sendRecipient.slice(0, 8)}...${sendRecipient.slice(-6)}`,
+      address: type !== "email" ? sendRecipient : undefined,
+      email: type === "email" ? sendRecipient : undefined,
+      initials: type === "email" ? sendRecipient.slice(0, 2).toUpperCase() : currency.slice(0, 2),
+      color: type === "btc" ? "bg-btc" : type === "usdc" ? "bg-usdc" : "bg-muted"
     });
     setSendStep("confirm");
   };
 
-  const handleConfirmSend = () => {
+  const handleConfirmSend = async () => {
     const recipientName = selectedSendContact?.name || sendRecipient;
-    toast.success(`Sent ${formatAmount(amount)} to ${recipientName}`);
-    resetSendFlow();
+    const recipientAddress = selectedSendContact?.address || selectedSendContact?.email || sendRecipient;
+    
+    setIsSending(true);
+    
+    try {
+      // Simulate network delay for transaction
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // In a real app, this would call the backend to initiate the transfer
+      // await supabase.functions.invoke('send-crypto', {
+      //   body: {
+      //     currency,
+      //     amount: parseFloat(amount),
+      //     recipientAddress,
+      //     networkFee
+      //   }
+      // });
+      
+      toast.success(
+        `Successfully sent ${amount} ${currency} to ${recipientName}`,
+        {
+          description: `Network fee: ${networkFee} ${currency}`,
+        }
+      );
+      resetSendFlow();
+    } catch (error) {
+      toast.error("Failed to send. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleOpenSendScanner = () => {
@@ -207,12 +370,15 @@ const SendRequest: React.FC = () => {
   };
 
   const handleSendScanComplete = (address: string) => {
+    const type = detectAddressType(address);
     setSendRecipient(address);
+    validateAddress(address);
     setSelectedSendContact({ 
       id: "scanned", 
-      name: address, 
+      name: `${address.slice(0, 8)}...${address.slice(-6)}`,
+      address,
       initials: "QR", 
-      color: "bg-primary" 
+      color: type === "btc" ? "bg-btc" : "bg-usdc"
     });
     setSendStep("confirm");
   };
@@ -222,6 +388,7 @@ const SendRequest: React.FC = () => {
     setSendRecipient("");
     setSelectedSendContact(null);
     setSendSearchQuery("");
+    setAddressValidation(null);
     setAmount("0");
   };
 
@@ -265,7 +432,7 @@ const SendRequest: React.FC = () => {
           </h1>
           
           {/* Currency Selector */}
-          <Select value={currency} onValueChange={setCurrency} disabled={!isKycApproved}>
+          <Select value={currency} onValueChange={(value) => setCurrency(value as "BTC" | "USDC")} disabled={!isKycApproved}>
             <SelectTrigger className="w-auto gap-1 bg-muted/50 border-0 rounded-full px-4 py-2 h-auto">
               <SelectValue />
               <ChevronDown className="h-3 w-3 opacity-50" />
@@ -580,9 +747,11 @@ const SendRequest: React.FC = () => {
 
             <div className="pt-4">
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                Send {formatAmount(amount)}
+                Send {amount} {currency}
               </h2>
-              <p className="text-muted-foreground mt-1">Select recipient</p>
+              <p className="text-muted-foreground mt-1">
+                ≈ ${amountUsd.toFixed(2)} USD • Balance: {availableBalance} {currency}
+              </p>
             </div>
 
             {/* Search / Enter Address */}
@@ -592,21 +761,46 @@ const SendRequest: React.FC = () => {
                 <Input
                   value={sendRecipient}
                   onChange={(e) => {
-                    setSendRecipient(e.target.value);
-                    setSendSearchQuery(e.target.value);
+                    const value = e.target.value;
+                    setSendRecipient(value);
+                    setSendSearchQuery(value);
+                    validateAddress(value);
                   }}
-                  placeholder="Email, phone, or wallet address"
-                  className="pl-10 h-12 rounded-xl bg-muted/50 border-0"
+                  placeholder={currency === "BTC" ? "BTC address or email" : "Solana address or email"}
+                  className={`pl-10 pr-10 h-12 rounded-xl bg-muted/50 border-2 transition-colors ${
+                    addressValidation?.isValid === false 
+                      ? "border-destructive" 
+                      : addressValidation?.isValid === true 
+                        ? "border-success" 
+                        : "border-transparent"
+                  }`}
                 />
+                {addressValidation && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {addressValidation.isValid ? (
+                      <CheckCircle2 className="h-5 w-5 text-success" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Address validation message */}
+              {addressValidation && (
+                <p className={`text-sm ${addressValidation.isValid ? "text-success" : "text-destructive"}`}>
+                  {addressValidation.message}
+                </p>
+              )}
 
               {sendRecipient && (
                 <Button
                   onClick={handleManualSendRecipient}
                   variant="secondary"
                   className="w-full h-12 rounded-full"
+                  disabled={addressValidation?.isValid === false}
                 >
-                  Send to "{sendRecipient}"
+                  Send to {sendRecipient.length > 20 ? `${sendRecipient.slice(0, 8)}...${sendRecipient.slice(-6)}` : sendRecipient}
                 </Button>
               )}
 
@@ -653,19 +847,20 @@ const SendRequest: React.FC = () => {
       </Drawer>
 
       {/* Send Confirm Drawer */}
-      <Drawer open={sendStep === "confirm"} onOpenChange={(open) => !open && setSendStep("closed")}>
+      <Drawer open={sendStep === "confirm"} onOpenChange={(open) => !open && !isSending && setSendStep("closed")}>
         <DrawerContent className="bg-card border-t border-border">
           <div className="p-6 space-y-6">
             <button 
               onClick={handleSendBack}
-              className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors"
+              disabled={isSending}
+              className="absolute top-4 left-4 p-2 hover:bg-muted rounded-full transition-colors disabled:opacity-50"
             >
               <ArrowLeft className="h-5 w-5 text-foreground" />
             </button>
 
             <div className="pt-4 text-center space-y-4">
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                Send {formatAmount(amount)}
+                Confirm Send
               </h2>
               
               {selectedSendContact && (
@@ -680,26 +875,77 @@ const SendRequest: React.FC = () => {
                     {selectedSendContact.email && (
                       <p className="text-sm text-muted-foreground">{selectedSendContact.email}</p>
                     )}
+                    {selectedSendContact.address && (
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {selectedSendContact.address.slice(0, 12)}...{selectedSendContact.address.slice(-8)}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="space-y-3 pt-4">
+            {/* Transaction Summary */}
+            <div className="bg-muted/50 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Amount</span>
+                <span className="font-medium">{amount} {currency}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Network Fee</span>
+                <span className="font-medium">{networkFee} {currency}</span>
+              </div>
+              <div className="border-t border-border pt-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Total</span>
+                  <div className="text-right">
+                    <p className="font-bold text-lg">{totalAmount.toFixed(currency === "BTC" ? 8 : 2)} {currency}</p>
+                    <p className="text-sm text-muted-foreground">
+                      ≈ ${(currency === "BTC" ? totalAmount * currentBtcPrice : totalAmount).toFixed(2)} USD
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Balance Warning */}
+            {!hasSufficientBalance && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-xl text-destructive">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <p className="text-sm">
+                  Insufficient balance. You need {totalAmount.toFixed(currency === "BTC" ? 8 : 2)} {currency} but only have {availableBalance} {currency}.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-2">
               <Button
                 onClick={handleConfirmSend}
+                disabled={isSending || !hasSufficientBalance}
                 className="w-full h-14 text-base font-medium rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-                Confirm Send
+                {isSending ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  `Send ${amount} ${currency}`
+                )}
               </Button>
               <Button
                 onClick={handleSendBack}
+                disabled={isSending}
                 variant="ghost"
                 className="w-full h-12 text-base font-medium rounded-full"
               >
                 Cancel
               </Button>
             </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              Transactions are final and cannot be reversed. Please verify the recipient address.
+            </p>
           </div>
         </DrawerContent>
       </Drawer>
