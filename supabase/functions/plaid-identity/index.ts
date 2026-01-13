@@ -215,7 +215,7 @@ serve(async (req) => {
       }
 
       const status = verificationData.status;
-      const steps = verificationData.steps;
+      const steps = verificationData.steps || {};
 
       // Map Plaid status to our KYC status
       let kycStatus: 'pending' | 'approved' | 'rejected' = 'pending';
@@ -225,10 +225,13 @@ serve(async (req) => {
         kycStatus = 'approved';
       } else if (status === 'failed') {
         kycStatus = 'rejected';
-        // Get rejection reason from failed steps
-        const failedSteps = steps?.filter((s: { status: string }) => s.status === 'failed') || [];
-        rejectionReason = failedSteps.length > 0 
-          ? `Verification failed: ${failedSteps.map((s: { name: string }) => s.name).join(', ')}`
+        // Steps is an object with step names as keys, not an array
+        // Find which steps failed
+        const failedStepNames = Object.entries(steps)
+          .filter(([_, stepStatus]) => stepStatus === 'failed')
+          .map(([stepName, _]) => stepName.replace(/_/g, ' '));
+        rejectionReason = failedStepNames.length > 0 
+          ? `Verification failed: ${failedStepNames.join(', ')}`
           : 'Identity verification failed';
       } else if (status === 'expired') {
         kycStatus = 'rejected';
