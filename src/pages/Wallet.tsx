@@ -14,7 +14,7 @@ import { UsdcActionsModal } from "@/components/wallet/UsdcActionsModal";
 import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
 import { CashOutModal } from "@/components/wallet/CashOutModal";
 import { CashOutHistory } from "@/components/wallet/CashOutHistory";
-
+import { ReceiveModal } from "@/components/wallet/ReceiveModal";
 // Mock account performance data with more realistic values for demo
 const accountPerformanceData = [
   { date: "Jan 4", value: 0 },
@@ -55,6 +55,7 @@ const Wallet: React.FC = () => {
   const [buySellModalOpen, setBuySellModalOpen] = useState(false);
   const [usdcActionsModalOpen, setUsdcActionsModalOpen] = useState(false);
   const [cashOutModalOpen, setCashOutModalOpen] = useState(false);
+  const [receiveModalOpen, setReceiveModalOpen] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     // Simulate refresh delay
@@ -171,11 +172,20 @@ const Wallet: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
-          <Button disabled={!isKycApproved} className="gap-2 flex-1 sm:flex-none text-sm">
+          <Button 
+            disabled={!isKycApproved} 
+            className="gap-2 flex-1 sm:flex-none text-sm"
+            onClick={() => navigate("/send")}
+          >
             <Send className="h-4 w-4" />
             Send
           </Button>
-          <Button variant="outline" disabled={!isKycApproved} className="gap-2 flex-1 sm:flex-none text-sm">
+          <Button 
+            variant="outline" 
+            disabled={!isKycApproved} 
+            className="gap-2 flex-1 sm:flex-none text-sm"
+            onClick={() => setReceiveModalOpen(true)}
+          >
             <Download className="h-4 w-4" />
             Receive
           </Button>
@@ -349,6 +359,14 @@ const Wallet: React.FC = () => {
           btcBalance={mockBtcBalance}
           usdcBalance={mockUsdcBalance}
           currentBtcPrice={currentBtcPrice}
+        />
+
+        {/* Receive Modal */}
+        <ReceiveModal
+          open={receiveModalOpen}
+          onOpenChange={setReceiveModalOpen}
+          btcAddress={profile?.btc_address}
+          usdcAddress={profile?.usdc_address}
         />
       </div>
     </DashboardLayout>
