@@ -109,7 +109,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
                   />
                 </div>
                 <div className="w-full p-3 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1 text-center">USDC Address (Solana)</p>
+                  <p className="text-xs text-muted-foreground mb-1 text-center">USDC Address (Ethereum)</p>
                   <code className="text-xs block text-center break-all">{usdcAddress}</code>
                 </div>
                 <Button 
@@ -130,7 +130,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
                   )}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  Only send USDC on Solana to this address. Sending any other asset or network may result in permanent loss.
+                  Only send USDC on Ethereum (ERC-20) to this address. Sending any other asset or network may result in permanent loss.
                 </p>
               </div>
             ) : (
