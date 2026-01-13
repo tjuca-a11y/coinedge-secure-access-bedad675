@@ -149,8 +149,9 @@ export const useUserBankAccounts = () => {
   return useQuery({
     queryKey: ['user-bank-accounts'],
     queryFn: async () => {
+      // Use the secure view that excludes sensitive columns like plaid_access_token
       const { data, error } = await supabase
-        .from('user_bank_accounts')
+        .from('user_bank_accounts_public')
         .select('id, bank_name, account_mask, account_type, is_verified, is_primary, created_at, user_id')
         .order('is_primary', { ascending: false });
 
