@@ -327,7 +327,7 @@ const AdminReconciliation: React.FC = () => {
                     placeholder={form.asset_type === 'BTC' ? '0.00000000' : '0.00'}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Enter the actual balance from Fireblocks or blockchain explorer.
+                    Enter the actual balance from the CoinEdge wallet or blockchain explorer.
                   </p>
                 </div>
                 <div>

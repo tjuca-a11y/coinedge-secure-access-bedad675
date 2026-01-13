@@ -8,8 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface TreasuryWallet {
   id: string;
-  fireblocks_vault_id: string;
-  fireblocks_wallet_id: string | null;
   btc_address: string | null;
   usdc_address: string | null;
   asset_type: 'BTC' | 'USDC';

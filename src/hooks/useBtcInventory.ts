@@ -4,8 +4,6 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface TreasuryWallet {
   id: string;
-  fireblocks_vault_id: string;
-  fireblocks_wallet_id: string | null;
   btc_address: string | null;
   label: string;
   is_active: boolean;
@@ -59,7 +57,6 @@ export interface FulfillmentOrder {
   btc_price_used: number | null;
   status: 'SUBMITTED' | 'KYC_PENDING' | 'WAITING_INVENTORY' | 'READY_TO_SEND' | 'SENDING' | 'SENT' | 'FAILED' | 'HOLD';
   blocked_reason: string | null;
-  fireblocks_transfer_id: string | null;
   tx_hash: string | null;
   created_at: string;
   updated_at: string;
@@ -99,10 +96,13 @@ export const useCreateTreasuryWallet = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (wallet: Omit<TreasuryWallet, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (wallet: { btc_address?: string; label?: string; is_active: boolean }) => {
       const { data, error } = await supabase
         .from('treasury_wallet')
-        .insert(wallet)
+        .insert({
+          ...wallet,
+          fireblocks_vault_id: 'coinedge-treasury', // Legacy field - kept for DB compatibility
+        })
         .select()
         .single();
 
@@ -183,8 +183,6 @@ export const useCreateInventoryLot = () => {
         .single();
 
       if (error) throw error;
-      return data;
-
       return data;
     },
     onSuccess: () => {
@@ -276,13 +274,10 @@ export const useUpdateFulfillmentOrder = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, updates, action }: { 
+    mutationFn: async ({ id, updates }: { 
       id: string; 
       updates: Partial<FulfillmentOrder>;
-      action: string;
     }) => {
-      const { data: user } = await supabase.auth.getUser();
-      
       const { data, error } = await supabase
         .from('fulfillment_orders')
         .update(updates)

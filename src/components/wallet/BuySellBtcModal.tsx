@@ -11,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowRight, ArrowUpRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wallet, Building2 } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wallet, Building2, Shield, Pen } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
+import { useCoinEdgeTransfer } from "@/hooks/useCoinEdgeTransfer";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -37,7 +38,6 @@ interface BuySellBtcModalProps {
   usdcBalance: number;
 }
 
-type OrderType = "BUY_BTC" | "SELL_BTC";
 type PaymentMethod = "usdc_wallet" | "plaid_bank";
 
 export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
@@ -47,12 +47,15 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   btcBalance,
   usdcBalance,
 }) => {
-  const { user, profile, isKycApproved } = useAuth();
+  const { user, isKycApproved } = useAuth();
+  const { isConnected, btcWallet, signMessage } = useDynamicWallet();
+  const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
+  
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("usdc_wallet");
   const [isPlaidConnected, setIsPlaidConnected] = useState(false);
+  const [showQuote, setShowQuote] = useState(false);
 
   // Calculate conversion
   const usdAmount = parseFloat(amount) || 0;
@@ -69,15 +72,33 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   useEffect(() => {
     setAmount("");
     setPaymentMethod("usdc_wallet");
-  }, [activeTab]);
+    setShowQuote(false);
+    clearQuote();
+  }, [activeTab, clearQuote]);
 
   const handleConnectPlaid = () => {
-    // TODO: Integrate with Plaid Link
     toast.info("Plaid integration coming soon! For now, please use your USDC wallet.");
   };
 
+  const handleGetQuote = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    const quoteResult = await getQuote({
+      type: activeTab === "buy" ? "BUY_BTC" : "SELL_BTC",
+      amount: usdAmount,
+      asset: activeTab === "buy" ? "USDC" : "BTC",
+    });
+
+    if (quoteResult) {
+      setShowQuote(true);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!user || !profile) {
+    if (!user) {
       toast.error("Please sign in to continue");
       return;
     }
@@ -87,24 +108,19 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
       return;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error("Please enter a valid amount");
+    if (!isConnected || !btcWallet) {
+      toast.error("Please connect your wallet first");
       return;
     }
 
-    const orderType: OrderType = activeTab === "buy" ? "BUY_BTC" : "SELL_BTC";
-    const btcAmt = activeTab === "buy" ? btcAmount : btcToSell;
-    const usdcAmt = activeTab === "buy" ? totalCost : usdAmount;
-    const feeAmt = activeTab === "buy" ? fee : sellFee;
+    if (!quote) {
+      toast.error("Please get a quote first");
+      return;
+    }
 
     // Validation
     if (activeTab === "buy" && paymentMethod === "usdc_wallet" && totalCost > usdcBalance) {
       toast.error("Insufficient USDC balance");
-      return;
-    }
-
-    if (activeTab === "buy" && paymentMethod === "plaid_bank" && !isPlaidConnected) {
-      toast.error("Please connect your bank account first");
       return;
     }
 
@@ -113,42 +129,15 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
       return;
     }
 
-    // Get destination address
-    const destinationAddress = activeTab === "buy" ? profile.btc_address : profile.usdc_address;
-    if (!destinationAddress) {
-      toast.error(`Please set up your ${activeTab === "buy" ? "BTC" : "USDC"} wallet address first`);
-      return;
-    }
+    const result = await executeTransfer({
+      quoteId: quote.quoteId,
+      type: activeTab === "buy" ? "BUY_BTC" : "SELL_BTC",
+    });
 
-    setIsSubmitting(true);
-
-    try {
-      const { error } = await supabase.from("customer_swap_orders").insert({
-        customer_id: user.id,
-        order_type: orderType,
-        btc_amount: btcAmt,
-        usdc_amount: usdcAmt,
-        btc_price_at_order: currentBtcPrice,
-        fee_usdc: feeAmt,
-        destination_address: destinationAddress,
-        status: "PENDING",
-      });
-
-      if (error) throw error;
-
-      toast.success(
-        activeTab === "buy"
-          ? `Order placed to buy ${btcAmt.toFixed(8)} BTC`
-          : `Order placed to sell ${btcToSell.toFixed(8)} BTC`
-      );
-      
+    if (result.success) {
       setAmount("");
+      setShowQuote(false);
       onOpenChange(false);
-    } catch (error: any) {
-      console.error("Error creating swap order:", error);
-      toast.error(error.message || "Failed to create order");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -160,6 +149,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
       const maxReceive = btcBalance * currentBtcPrice * 0.99; // After 1% fee
       setAmount((maxReceive * pct).toFixed(2));
     }
+    setShowQuote(false);
   };
 
   return (
@@ -215,6 +205,16 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
 
         {/* KYC Banner if not approved */}
         {!isKycApproved && <KycBanner />}
+
+        {/* Wallet not connected warning */}
+        {isKycApproved && !isConnected && (
+          <Card className="p-3 border-amber-500/50 bg-amber-500/5 mb-4">
+            <div className="flex items-center gap-2 text-amber-600 text-sm">
+              <Wallet className="h-4 w-4" />
+              Connect your wallet to trade
+            </div>
+          </Card>
+        )}
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "buy" | "sell")}>
           <TabsList className="grid w-full grid-cols-2">
@@ -295,7 +295,10 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
                   type="number"
                   placeholder="0.00"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => {
+                    setAmount(e.target.value);
+                    setShowQuote(false);
+                  }}
                   className="pl-9"
                 />
               </div>
@@ -345,30 +348,32 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
               </div>
             )}
 
-            {paymentMethod === "plaid_bank" && !isPlaidConnected && amount && (
-              <div className="flex items-center gap-2 text-amber-600 text-sm">
-                <AlertCircle className="h-4 w-4" />
-                Connect your bank account to continue
-              </div>
-            )}
+            {/* Self-custody notice */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+              <Shield className="h-3 w-3" />
+              BTC will be sent to your self-custody wallet
+            </div>
 
             <Button
-              onClick={handleSubmit}
+              onClick={showQuote ? handleSubmit : handleGetQuote}
               disabled={
-                isSubmitting || 
+                isLoading || 
                 !amount || 
+                !isConnected ||
                 (paymentMethod === "usdc_wallet" && totalCost > usdcBalance) ||
                 (paymentMethod === "plaid_bank" && !isPlaidConnected)
               }
               className="w-full"
             >
-              {isSubmitting ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
                 </>
-              ) : (
+              ) : showQuote ? (
                 `Buy ${btcAmount.toFixed(8)} BTC`
+              ) : (
+                "Get Quote"
               )}
             </Button>
           </TabsContent>
@@ -387,7 +392,10 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
                   type="number"
                   placeholder="0.00"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => {
+                    setAmount(e.target.value);
+                    setShowQuote(false);
+                  }}
                   className="pl-9"
                 />
               </div>
@@ -435,26 +443,34 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
               </div>
             )}
 
+            {/* Signing notice for sells */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+              <Pen className="h-3 w-3" />
+              You'll sign a message to authorize this transfer
+            </div>
+
             <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !amount || btcToSell > btcBalance}
+              onClick={showQuote ? handleSubmit : handleGetQuote}
+              disabled={isLoading || !amount || !isConnected || btcToSell > btcBalance}
               className="w-full"
               variant="destructive"
             >
-              {isSubmitting ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
                 </>
-              ) : (
+              ) : showQuote ? (
                 `Sell ${btcToSell.toFixed(8)} BTC`
+              ) : (
+                "Get Quote"
               )}
             </Button>
           </TabsContent>
         </Tabs>
 
         <p className="text-xs text-muted-foreground text-center">
-          Trades are executed against CoinEdge inventory. Orders are processed within minutes.
+          Trades are executed wallet-to-wallet. CoinEdge is the counterparty. Orders are processed within minutes.
         </p>
       </DialogContent>
     </Dialog>
