@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -30,12 +30,33 @@ interface PlaidVerificationResultResponse {
   error?: string;
 }
 
+// Cooldown period in hours after a failed KYC attempt
+const KYC_COOLDOWN_HOURS = 24;
+
 export const useKyc = () => {
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
   const [identityVerificationId, setIdentityVerificationId] = useState<string | null>(null);
+
+  // Calculate cooldown status
+  const cooldownInfo = useMemo(() => {
+    const retryAvailableAt = profile?.kyc_retry_available_at;
+    if (!retryAvailableAt) {
+      return { isInCooldown: false, remainingMs: 0, retryAvailableAt: null };
+    }
+
+    const retryDate = new Date(retryAvailableAt);
+    const now = new Date();
+    const remainingMs = retryDate.getTime() - now.getTime();
+    
+    return {
+      isInCooldown: remainingMs > 0,
+      remainingMs: Math.max(0, remainingMs),
+      retryAvailableAt: retryDate,
+    };
+  }, [profile?.kyc_retry_available_at]);
 
   // Submit personal info to prefill Plaid Identity
   const submitPersonalInfo = async (data: KycFormData) => {
@@ -158,6 +179,17 @@ export const useKyc = () => {
       const data = await response.json();
 
       if (data.success) {
+        // If verification failed, set cooldown period
+        if (data.status === 'rejected') {
+          const cooldownEnd = new Date();
+          cooldownEnd.setHours(cooldownEnd.getHours() + KYC_COOLDOWN_HOURS);
+          
+          await supabase
+            .from('profiles')
+            .update({ kyc_retry_available_at: cooldownEnd.toISOString() })
+            .eq('user_id', user.id);
+        }
+        
         await refreshProfile();
         return {
           success: true,
@@ -176,6 +208,44 @@ export const useKyc = () => {
       setLoading(false);
     }
   }, [user, refreshProfile]);
+
+  // Reset KYC status for retry (clears rejection and allows new attempt)
+  const initiateRetry = useCallback(async (): Promise<boolean> => {
+    if (!user) {
+      setError('User not authenticated');
+      return false;
+    }
+
+    if (cooldownInfo.isInCooldown) {
+      setError('Please wait for the cooldown period to end before retrying');
+      return false;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          kyc_status: 'not_started',
+          kyc_rejected_at: null,
+          kyc_rejection_reason: null,
+          kyc_retry_available_at: null,
+        })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      await refreshProfile();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to initiate retry');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [user, refreshProfile, cooldownInfo.isInCooldown]);
 
   // Submit KYC for manual review (fallback when Plaid not configured)
   const submitKycForReview = async () => {
@@ -257,11 +327,13 @@ export const useKyc = () => {
     error,
     plaidLinkToken,
     identityVerificationId,
+    cooldownInfo,
     submitPersonalInfo,
     createIdentityVerificationToken,
     handleVerificationComplete,
     submitKycForReview,
     simulateKycApproval,
     clearPlaidTokens,
+    initiateRetry,
   };
 };
