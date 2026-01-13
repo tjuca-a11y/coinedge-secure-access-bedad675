@@ -74,13 +74,13 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
   const ethWallet = wallets.find(w => w.chain === 'ETH') || null;
   const isConnected = isAuthenticated && wallets.length > 0;
 
-  // Sync Dynamic JWT to Supabase session
+  // Sync Dynamic auth to Supabase (creates/updates user profile)
   useEffect(() => {
     const syncToSupabase = async () => {
       const authToken = getAuthToken();
-      if (dynamicUser && authToken) {
+      if (dynamicUser && authToken && wallets.length > 0) {
         try {
-          // Call edge function to validate Dynamic JWT and create/sync Supabase session
+          // Call edge function to validate Dynamic JWT and create/sync Supabase user
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/dynamic-auth-sync`,
             {
@@ -98,13 +98,11 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
           );
 
           if (response.ok) {
-            const { supabaseToken } = await response.json();
-            if (supabaseToken) {
-              await supabase.auth.setSession({
-                access_token: supabaseToken.access_token,
-                refresh_token: supabaseToken.refresh_token,
-              });
-            }
+            const data = await response.json();
+            console.log('Dynamic auth synced to Supabase:', data.userId);
+          } else {
+            const error = await response.json();
+            console.error('Failed to sync Dynamic auth:', error);
           }
         } catch (error) {
           console.error('Failed to sync Dynamic auth to Supabase:', error);

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,40 @@ interface DynamicAuthRequest {
   walletAddresses: Array<{ address: string; chain: 'BTC' | 'ETH' }>;
 }
 
+// Cache for JWKS to avoid fetching on every request
+let jwksCache: jose.JWTVerifyGetKey | null = null;
+let jwksCacheTime = 0;
+const JWKS_CACHE_TTL = 3600000; // 1 hour
+
+async function getJWKS(environmentId: string): Promise<jose.JWTVerifyGetKey> {
+  const now = Date.now();
+  
+  if (jwksCache && (now - jwksCacheTime) < JWKS_CACHE_TTL) {
+    return jwksCache;
+  }
+  
+  const jwksUrl = `https://app.dynamic.xyz/api/v0/sdk/${environmentId}/.well-known/jwks`;
+  const JWKS = jose.createRemoteJWKSet(new URL(jwksUrl));
+  
+  jwksCache = JWKS;
+  jwksCacheTime = now;
+  
+  return JWKS;
+}
+
+async function verifyDynamicToken(token: string, environmentId: string): Promise<jose.JWTPayload | null> {
+  try {
+    const JWKS = await getJWKS(environmentId);
+    const { payload } = await jose.jwtVerify(token, JWKS, {
+      issuer: `https://app.dynamic.xyz/${environmentId}`,
+    });
+    return payload;
+  } catch (error) {
+    console.error('JWT verification failed:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -21,6 +56,10 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const dynamicPublicKey = Deno.env.get('DYNAMIC_PUBLIC_KEY');
+    
+    // Dynamic Environment ID from the public key or extract from token
+    // The public key format is typically: pk_live_XXXXX or pk_test_XXXXX
+    // We need the environment ID which is different - we'll extract from JWT issuer
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -34,14 +73,41 @@ serve(async (req) => {
     }
 
     const dynamicToken = authHeader.replace('Bearer ', '');
+    
+    // Decode token to get environment ID from issuer (without verification first)
+    let environmentId: string | undefined;
+    try {
+      const decoded = jose.decodeJwt(dynamicToken);
+      // Issuer format: https://app.dynamic.xyz/{environmentId}
+      if (decoded.iss && decoded.iss.startsWith('https://app.dynamic.xyz/')) {
+        environmentId = decoded.iss.replace('https://app.dynamic.xyz/', '');
+      }
+    } catch {
+      // Continue without environment ID extraction
+    }
 
-    // In production: Validate Dynamic JWT using JWKS
-    // For now, we trust the token and extract the user info from the body
-    // TODO: Implement proper JWT validation with Dynamic's JWKS endpoint
-    // https://app.dynamic.xyz/api/v0/sdk/{environmentId}/.well-known/jwks
+    // Verify the Dynamic JWT if we have the environment ID
+    let verifiedPayload: jose.JWTPayload | null = null;
+    if (environmentId) {
+      verifiedPayload = await verifyDynamicToken(dynamicToken, environmentId);
+      if (!verifiedPayload) {
+        return new Response(JSON.stringify({ error: 'Invalid Dynamic token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     const body: DynamicAuthRequest = await req.json();
     const { dynamicUserId, email, walletAddresses } = body;
+
+    // Validate that the token's subject matches the provided user ID
+    if (verifiedPayload && verifiedPayload.sub !== dynamicUserId) {
+      return new Response(JSON.stringify({ error: 'Token subject mismatch' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!dynamicUserId) {
       return new Response(JSON.stringify({ error: 'Missing Dynamic user ID' }), {
@@ -115,36 +181,14 @@ serve(async (req) => {
       });
     }
 
-    // Generate a Supabase session for the user
-    const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: supabaseUser.email!,
-      options: {
-        redirectTo: `${req.headers.get('origin') || 'https://coinedge.app'}/`,
-      },
-    });
-
-    if (sessionError) {
-      console.error('Error generating session:', sessionError);
-      // Fallback: Return user ID so frontend can handle auth differently
-      return new Response(JSON.stringify({ 
-        userId: supabaseUser.id,
-        message: 'User synced but session generation failed',
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Extract token from magic link for immediate login
-    // In production, you might want to use a different approach
-    // like generating a custom JWT that Supabase will accept
-
+    // Return success - the frontend will use Dynamic auth state
+    // Supabase session is optional for this flow since Dynamic handles auth
     return new Response(JSON.stringify({
       success: true,
       userId: supabaseUser.id,
-      message: 'User synced successfully',
-      // Note: For proper session, the frontend should handle the magic link
-      // or implement a custom JWT exchange mechanism
+      email: supabaseUser.email,
+      btcAddress,
+      ethAddress,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
