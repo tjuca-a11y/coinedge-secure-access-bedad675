@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useDynamicContext, useUserWallets, useAuthenticateConnectedUser } from '@dynamic-labs/sdk-react-core';
+import { useDynamicContext, useUserWallets, useAuthenticateConnectedUser, getAuthToken } from '@dynamic-labs/sdk-react-core';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -42,7 +42,6 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
     primaryWallet, 
     setShowAuthFlow, 
     handleLogOut,
-    authToken
   } = useDynamicContext();
   
   const userWallets = useUserWallets();
@@ -78,6 +77,7 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
   // Sync Dynamic JWT to Supabase session
   useEffect(() => {
     const syncToSupabase = async () => {
+      const authToken = getAuthToken();
       if (dynamicUser && authToken) {
         try {
           // Call edge function to validate Dynamic JWT and create/sync Supabase session
@@ -113,7 +113,7 @@ export const DynamicWalletProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     syncToSupabase();
-  }, [dynamicUser, authToken, wallets]);
+  }, [dynamicUser, wallets]);
 
   // Connect wallet - triggers Dynamic modal
   const connectWallet = useCallback(() => {

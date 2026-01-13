@@ -30,7 +30,7 @@ export const DynamicProvider: React.FC<DynamicProviderProps> = ({ children }) =>
         ],
         appName: 'CoinEdge',
         appLogoUrl: '/favicon.ico',
-        eventsCallbacks: {
+        events: {
           onAuthSuccess: (args) => {
             console.log('Dynamic auth success:', args.user?.userId);
           },
