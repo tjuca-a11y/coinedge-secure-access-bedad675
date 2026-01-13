@@ -442,20 +442,22 @@ export const KycFlow: React.FC = () => {
             )}
           </Button>
 
-          {/* Demo mode fallback */}
-          <div className="pt-4 border-t">
-            <p className="text-xs text-muted-foreground text-center mb-2">
-              Demo mode (Plaid not configured):
-            </p>
-            <Button
-              onClick={handleDemoIdentitySubmit}
-              variant="outline"
-              className="w-full"
-              disabled={loading}
-            >
-              Simulate Verification
-            </Button>
-          </div>
+          {/* Demo mode fallback - only show in development */}
+          {import.meta.env.DEV && (
+            <div className="pt-4 border-t">
+              <p className="text-xs text-muted-foreground text-center mb-2">
+                Development mode only:
+              </p>
+              <Button
+                onClick={handleDemoIdentitySubmit}
+                variant="outline"
+                className="w-full"
+                disabled={loading}
+              >
+                Simulate Verification
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -562,13 +564,15 @@ export const KycFlow: React.FC = () => {
               We'll notify you by email once your verification is complete.
             </p>
           </div>
-          {/* Demo button for testing */}
-          <div className="pt-4 border-t">
-            <p className="text-xs text-muted-foreground mb-2">For demo purposes only:</p>
-            <Button onClick={handleSimulateApproval} variant="outline" size="sm" disabled={loading}>
-              {loading ? 'Processing...' : 'Simulate Approval'}
-            </Button>
-          </div>
+          {/* Demo button for testing - only show in development */}
+          {import.meta.env.DEV && (
+            <div className="pt-4 border-t">
+              <p className="text-xs text-muted-foreground mb-2">Development mode only:</p>
+              <Button onClick={handleSimulateApproval} variant="outline" size="sm" disabled={loading}>
+                {loading ? 'Processing...' : 'Simulate Approval'}
+              </Button>
+            </div>
+          )}
         </div>
       );
     }

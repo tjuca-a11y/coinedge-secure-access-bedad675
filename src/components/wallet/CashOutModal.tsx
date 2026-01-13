@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserBankAccounts, useCreateCashoutOrder, useRemoveBankAccount } from "@/hooks/useTreasury";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
+import { KycBanner } from "@/components/kyc/KycBanner";
 
 interface CashOutModalProps {
   open: boolean;
@@ -43,7 +44,7 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   usdcBalance,
   currentBtcPrice,
 }) => {
-  const { user } = useAuth();
+  const { user, isKycApproved } = useAuth();
   const [sourceAsset, setSourceAsset] = useState<SourceAsset>("USDC");
   const [amount, setAmount] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -80,6 +81,10 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
       toast.error("Please sign in first");
       return;
     }
+    if (!isKycApproved) {
+      toast.error("Please complete KYC verification first");
+      return;
+    }
     openPlaidLink();
   };
 
@@ -95,6 +100,11 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   const handleSubmit = async () => {
     if (!user) {
       toast.error("Please sign in first");
+      return;
+    }
+
+    if (!isKycApproved) {
+      toast.error("Please complete KYC verification to cash out");
       return;
     }
 
@@ -146,6 +156,8 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
+          {/* KYC Banner if not approved */}
+          {!isKycApproved && <KycBanner />}
           {/* Source Asset Selection */}
           <div className="space-y-3">
             <Label>Sell from</Label>

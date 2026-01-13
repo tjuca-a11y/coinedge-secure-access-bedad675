@@ -15,6 +15,7 @@ import { ArrowRight, ArrowUpRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wa
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { KycBanner } from "@/components/kyc/KycBanner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 // Mock price data for BTC chart
@@ -46,7 +47,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   btcBalance,
   usdcBalance,
 }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, isKycApproved } = useAuth();
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,6 +79,11 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const handleSubmit = async () => {
     if (!user || !profile) {
       toast.error("Please sign in to continue");
+      return;
+    }
+
+    if (!isKycApproved) {
+      toast.error("Please complete KYC verification to trade");
       return;
     }
 
@@ -206,6 +212,9 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
             </div>
           </div>
         </Card>
+
+        {/* KYC Banner if not approved */}
+        {!isKycApproved && <KycBanner />}
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "buy" | "sell")}>
           <TabsList className="grid w-full grid-cols-2">

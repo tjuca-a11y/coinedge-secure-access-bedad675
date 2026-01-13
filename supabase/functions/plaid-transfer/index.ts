@@ -50,6 +50,25 @@ serve(async (req) => {
     const body: TransferRequest = await req.json();
     const { action, bank_account_id, amount_usd, source_asset, cashout_order_id } = body;
 
+    // KYC verification required for initiate_cashout
+    if (action === 'initiate_cashout') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('kyc_status')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profile?.kyc_status !== 'approved') {
+        return new Response(JSON.stringify({ 
+          error: 'KYC verification required',
+          code: 'KYC_REQUIRED'
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Get system settings
     const { data: settings } = await supabase
       .from('system_settings')

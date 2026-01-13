@@ -48,6 +48,25 @@ serve(async (req) => {
     const body: PlaidRequest = await req.json();
     const { action, public_token, account_id } = body;
 
+    // KYC verification required for exchange_public_token (linking bank accounts)
+    if (action === 'exchange_public_token') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('kyc_status')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profile?.kyc_status !== 'approved') {
+        return new Response(JSON.stringify({ 
+          error: 'KYC verification required',
+          code: 'KYC_REQUIRED'
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Check if Plaid is configured
     if (!plaidClientId || !plaidSecret) {
       console.log('Plaid not configured - returning mock response');

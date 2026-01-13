@@ -475,6 +475,13 @@ export type Database = {
             referencedRelation: "user_bank_accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cashout_orders_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "user_bank_accounts_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       commission_ledger: {
@@ -1662,7 +1669,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_bank_accounts_public: {
+        Row: {
+          account_mask: string | null
+          account_type: string | null
+          bank_name: string | null
+          created_at: string | null
+          id: string | null
+          is_primary: boolean | null
+          is_verified: boolean | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          account_mask?: string | null
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          account_mask?: string | null
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       allocate_btc_fifo: {
