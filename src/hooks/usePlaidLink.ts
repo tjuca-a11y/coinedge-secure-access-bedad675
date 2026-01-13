@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { usePlaidLink as usePlaidLinkSDK, PlaidLinkOnSuccess, PlaidLinkOptions } from 'react-plaid-link';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -122,10 +122,12 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
   }, []);
 
   // Open Plaid Link when token is ready
-  if (linkToken && ready) {
-    open();
-    setIsLoading(false);
-  }
+  useEffect(() => {
+    if (linkToken && ready) {
+      open();
+      setIsLoading(false);
+    }
+  }, [linkToken, ready, open]);
 
   return {
     openPlaidLink,
