@@ -1,10 +1,12 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LoginForm } from '@/components/auth/LoginForm';
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+import { DynamicLoginForm } from '@/components/auth/DynamicLoginForm';
 
 const Login: React.FC = () => {
-  const { user, loading, isKycApproved } = useAuth();
+  const { user, loading } = useAuth();
+  const { user: dynamicUser } = useDynamicContext();
 
   if (loading) {
     return (
@@ -14,14 +16,14 @@ const Login: React.FC = () => {
     );
   }
 
-  if (user) {
-    // If user is logged in, go to dashboard (KYC only required for redemption)
+  // Redirect if authenticated via either method
+  if (user || dynamicUser) {
     return <Navigate to="/" replace />;
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <LoginForm />
+      <DynamicLoginForm />
     </div>
   );
 };

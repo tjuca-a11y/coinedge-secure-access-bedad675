@@ -18,6 +18,8 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   isKycApproved: boolean;
   kycStatus: KycStatus | null;
+  // Dynamic integration
+  isDynamicLinked: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -144,6 +146,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isKycApproved = profile?.kyc_status === 'approved';
   const kycStatus = profile?.kyc_status ?? null;
+  
+  // Check if user has Dynamic wallet linked (stored in user metadata or profile)
+  const isDynamicLinked = !!(
+    user?.user_metadata?.dynamic_user_id ||
+    profile?.btc_address ||
+    profile?.usdc_address
+  );
 
   return (
     <AuthContext.Provider
@@ -159,6 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshProfile,
         isKycApproved,
         kycStatus,
+        isDynamicLinked,
       }}
     >
       {children}
