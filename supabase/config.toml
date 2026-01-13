@@ -9,6 +9,18 @@ verify_jwt = false
 [functions.create-demo-merchant]
 verify_jwt = false
 
+[functions.create-demo-admin]
+verify_jwt = false
+
+[functions.create-demo-sales-rep]
+verify_jwt = false
+
+[functions.create-demo-user]
+verify_jwt = false
+
+[functions.create-all-demo-accounts]
+verify_jwt = false
+
 [functions.fireblocks-transfer]
 verify_jwt = false
 
@@ -18,7 +30,28 @@ verify_jwt = false
 [functions.plaid-transfer]
 verify_jwt = false
 
+[functions.plaid-identity]
+verify_jwt = false
+
+[functions.plaid-webhook]
+verify_jwt = false
+
 [functions.process-fulfillment-queue]
+verify_jwt = false
+
+[functions.dynamic-auth-sync]
+verify_jwt = false
+
+[functions.coinedge-quote]
+verify_jwt = false
+
+[functions.coinedge-transfer]
+verify_jwt = false
+
+[functions.validate-voucher]
+verify_jwt = false
+
+[functions.wallet-balances]
 verify_jwt = false
 
 # Cron job to run fulfillment queue processing every 5 minutes
