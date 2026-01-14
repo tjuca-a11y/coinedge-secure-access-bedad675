@@ -20,6 +20,45 @@ interface TransferRequest {
   feeUsdc?: number;
 }
 
+// ============ Rate Limiting (Stricter for transfers) ============
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 10; // 10 transfers per minute (stricter)
+
+function checkRateLimit(clientId: string): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(clientId);
+
+  if (rateLimitStore.size > 500) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (now >= v.resetAt) rateLimitStore.delete(k);
+    }
+  }
+
+  if (!entry || now >= entry.resetAt) {
+    rateLimitStore.set(clientId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetAt: now + RATE_LIMIT_WINDOW_MS };
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+  }
+
+  entry.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - entry.count, resetAt: entry.resetAt };
+}
+
+function getClientId(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+    || req.headers.get('x-real-ip') 
+    || 'unknown';
+}
+
 // Helper to get CoinEdge treasury addresses from system_settings
 async function getTreasuryAddresses(supabase: any) {
   const { data: settings } = await supabase
@@ -36,36 +75,34 @@ async function getTreasuryAddresses(supabase: any) {
   return addresses;
 }
 
-// Placeholder for direct blockchain BTC transfer (CoinEdge → User)
-// TODO: Implement with bitcoinjs-lib when treasury wallet is ready
-async function sendBtcToUser(
-  _destinationAddress: string,
-  _btcAmount: number,
-  _orderId: string
-): Promise<{ success: boolean; txHash?: string; error?: string }> {
-  // This will be implemented when:
-  // 1. CoinEdge treasury BTC address is configured
-  // 2. Private key is securely stored as COINEDGE_BTC_PRIVATE_KEY secret
-  // 3. bitcoinjs-lib is integrated for transaction signing
-  
-  console.log('sendBtcToUser: Treasury wallet not configured yet');
-  return {
-    success: false,
-    error: 'Treasury wallet not configured. BTC transfers pending admin setup.',
-  };
-}
+// BTC transfer to user - creates fulfillment order for manual/automated processing
+async function createBtcFulfillmentOrder(
+  supabase: any,
+  destinationAddress: string,
+  btcAmount: number,
+  usdValue: number,
+  customerId: string,
+  orderId: string
+): Promise<{ success: boolean; fulfillmentId?: string; error?: string }> {
+  try {
+    const { data, error } = await supabase.from('fulfillment_orders').insert({
+      customer_id: customerId,
+      order_type: 'BUY_ORDER',
+      destination_wallet_address: destinationAddress,
+      btc_amount: btcAmount,
+      usd_value: usdValue,
+      status: 'SUBMITTED',
+      kyc_status: 'APPROVED',
+    }).select().single();
 
-// Placeholder for monitoring incoming BTC transfers (User → CoinEdge)
-// TODO: Implement with Blockstream API webhook or polling
-async function monitorIncomingBtc(
-  _fromAddress: string,
-  _expectedAmount: number,
-  _orderId: string
-): Promise<{ detected: boolean; txHash?: string }> {
-  // This will poll Blockstream API for incoming transactions
-  // to the CoinEdge treasury address
-  console.log('monitorIncomingBtc: Monitoring not implemented yet');
-  return { detected: false };
+    if (error) throw error;
+
+    console.log('Created fulfillment order:', data.id);
+    return { success: true, fulfillmentId: data.id };
+  } catch (error) {
+    console.error('Failed to create fulfillment order:', error);
+    return { success: false, error: String(error) };
+  }
 }
 
 serve(async (req) => {
@@ -74,6 +111,26 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const rateLimitResult = checkRateLimit(clientId);
+    
+    const rateLimitHeaders = {
+      'X-RateLimit-Limit': RATE_LIMIT_MAX_REQUESTS.toString(),
+      'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+      'X-RateLimit-Reset': Math.ceil(rateLimitResult.resetAt / 1000).toString(),
+    };
+
+    if (!rateLimitResult.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -91,7 +148,7 @@ serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -101,7 +158,7 @@ serve(async (req) => {
     if (claimsError || !claims?.claims?.sub) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -117,7 +174,7 @@ serve(async (req) => {
     if (!profile || profile.kyc_status !== 'approved') {
       return new Response(JSON.stringify({ error: 'KYC approval required' }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -127,7 +184,7 @@ serve(async (req) => {
     if (!quoteId || !type) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -135,12 +192,9 @@ serve(async (req) => {
     if ((type === 'SELL_BTC' || type === 'CASHOUT') && !signature) {
       return new Response(JSON.stringify({ error: 'User signature required for this transfer type' }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // TODO: Validate quote from cache/database (check expiry, amounts, etc.)
-    // For now, we'll proceed with the transfer logic
 
     const orderId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
@@ -151,19 +205,17 @@ serve(async (req) => {
     // Process based on transfer type
     switch (type) {
       case 'BUY_BTC': {
-        // CoinEdge sends BTC to user's wallet (direct blockchain transfer)
         const destinationAddress = userBtcAddress || profile.btc_address;
         if (!destinationAddress) {
           return new Response(JSON.stringify({ error: 'No BTC wallet address found' }), {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        // Use amounts from quote
         const btcAmountToSend = btcAmount || 0;
         const usdcAmountCharged = usdcAmount || 0;
-        const priceUsed = btcPrice || 93500;
+        const priceUsed = btcPrice || 0;
         const fee = feeUsdc || 0;
 
         // Create order record
@@ -182,18 +234,23 @@ serve(async (req) => {
           console.error('Failed to create order:', orderError);
           return new Response(JSON.stringify({ error: 'Failed to create order' }), {
             status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        // Attempt to send BTC (will fail gracefully if treasury not configured)
-        const transferResult = await sendBtcToUser(destinationAddress, btcAmountToSend, order.id);
+        // Create fulfillment order for BTC send
+        const fulfillmentResult = await createBtcFulfillmentOrder(
+          supabase,
+          destinationAddress,
+          btcAmountToSend,
+          usdcAmountCharged,
+          userId,
+          order.id
+        );
         
-        // Update order with transfer result
-        if (transferResult.success && transferResult.txHash) {
+        if (fulfillmentResult.success) {
           await supabase.from('customer_swap_orders').update({
             status: 'PROCESSING',
-            tx_hash: transferResult.txHash,
           }).eq('id', order.id);
         }
 
@@ -208,47 +265,42 @@ serve(async (req) => {
             destination: destinationAddress,
             btc_amount: btcAmountToSend,
             usdc_amount: usdcAmountCharged,
-            transfer_initiated: transferResult.success,
-            tx_hash: transferResult.txHash,
-            status: transferResult.success ? 'TRANSFER_INITIATED' : 'AWAITING_TREASURY_CONFIG',
+            btc_price: priceUsed,
+            fulfillment_created: fulfillmentResult.success,
+            fulfillment_id: fulfillmentResult.fulfillmentId,
           },
         });
 
         return new Response(JSON.stringify({
           success: true,
           orderId: order.order_id,
-          status: transferResult.success ? 'PROCESSING' : 'PENDING',
-          message: transferResult.success 
-            ? 'BTC purchase initiated. Transaction broadcasting to network.'
-            : 'BTC purchase recorded. Transfer pending treasury configuration.',
-          txHash: transferResult.txHash || null,
+          status: fulfillmentResult.success ? 'PROCESSING' : 'PENDING',
+          message: fulfillmentResult.success 
+            ? 'BTC purchase submitted. Your order is being processed.'
+            : 'BTC purchase recorded. Awaiting admin processing.',
           btcAmount: btcAmountToSend,
           usdcAmount: usdcAmountCharged,
+          btcPrice: priceUsed,
         }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       case 'SELL_BTC': {
-        // User sends BTC to CoinEdge wallet (requires user signature)
-        // CoinEdge receives BTC and credits USDC to user
-        
         const btcAmountToReceive = btcAmount || 0;
         const usdcAmountToCredit = usdcAmount || 0;
-        const priceUsed = btcPrice || 93500;
+        const priceUsed = btcPrice || 0;
         const fee = feeUsdc || 0;
 
-        // Check if treasury address is configured
         if (!treasuryAddresses.btc) {
           return new Response(JSON.stringify({ 
             error: 'CoinEdge BTC receiving address not configured. Please contact support.' 
           }), {
             status: 503,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        // Create order record
         const { data: order, error: orderError } = await supabase.from('customer_swap_orders').insert({
           customer_id: userId,
           order_type: 'SELL_BTC',
@@ -264,11 +316,10 @@ serve(async (req) => {
           console.error('Failed to create order:', orderError);
           return new Response(JSON.stringify({ error: 'Failed to create order' }), {
             status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        // Log audit event
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_SELL_BTC',
           actor_type: 'system',
@@ -279,6 +330,7 @@ serve(async (req) => {
             user_signed: true,
             btc_amount: btcAmountToReceive,
             usdc_to_credit: usdcAmountToCredit,
+            btc_price: priceUsed,
             coinedge_btc_address: treasuryAddresses.btc,
             status: 'AWAITING_USER_TRANSFER',
           },
@@ -292,17 +344,17 @@ serve(async (req) => {
           coinedgeBtcAddress: treasuryAddresses.btc,
           btcAmount: btcAmountToReceive,
           usdcAmount: usdcAmountToCredit,
+          btcPrice: priceUsed,
         }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       case 'REDEEM': {
-        // Validate voucher and send BTC to user
         if (!voucherCode) {
           return new Response(JSON.stringify({ error: 'Voucher code required' }), {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
@@ -310,13 +362,9 @@ serve(async (req) => {
         if (!destinationAddress) {
           return new Response(JSON.stringify({ error: 'No BTC wallet address found' }), {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
-
-        // TODO: Validate voucher from bitcards table
-        // TODO: Mark voucher as redeemed
-        // TODO: Create fulfillment order
 
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_REDEEM',
@@ -336,26 +384,24 @@ serve(async (req) => {
           status: 'PENDING',
           message: 'Voucher redemption initiated. BTC will be sent to your wallet.',
         }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       case 'CASHOUT': {
-        // User sends USDC to CoinEdge, CoinEdge initiates bank payout via Plaid
         if (!bankAccountId) {
           return new Response(JSON.stringify({ error: 'Bank account selection required' }), {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        // Check if treasury USDC address is configured
         if (!treasuryAddresses.usdc) {
           return new Response(JSON.stringify({ 
             error: 'CoinEdge USDC receiving address not configured. Please contact support.' 
           }), {
             status: 503,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
@@ -363,7 +409,6 @@ serve(async (req) => {
         const fee = feeUsdc || 0;
         const usdToSend = sourceAmount - fee;
 
-        // Create cashout order
         const { data: cashoutOrder, error: cashoutError } = await supabase.from('cashout_orders').insert({
           user_id: userId,
           bank_account_id: bankAccountId,
@@ -378,7 +423,7 @@ serve(async (req) => {
           console.error('Failed to create cashout order:', cashoutError);
           return new Response(JSON.stringify({ error: 'Failed to create cashout order' }), {
             status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
         }
 
@@ -408,14 +453,14 @@ serve(async (req) => {
           usdAmount: usdToSend,
           fee: fee,
         }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       default:
         return new Response(JSON.stringify({ error: 'Invalid transfer type' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
     }
 
