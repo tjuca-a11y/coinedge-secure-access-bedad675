@@ -247,7 +247,9 @@ export const KycFlow: React.FC = () => {
   }, [plaidLinkToken, plaidIdentityReady, step, verificationStarted, openPlaidIdentity]);
 
   const handleStartVerification = async () => {
+    console.log('[KYC Flow] Start Identity Verification clicked');
     const tokenCreated = await createIdentityVerificationToken();
+    console.log('[KYC Flow] tokenCreated:', tokenCreated);
     if (!tokenCreated && error) {
       toast.info('Plaid not configured. Using demo mode.');
     }
