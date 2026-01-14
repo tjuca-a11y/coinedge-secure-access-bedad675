@@ -144,19 +144,19 @@ async function createAndFulfillBtcOrder(
   btcAmount: number,
   usdValue: number,
   btcPrice: number,
-  customerId: string,
+  customerProfileId: string,
   swapOrderId: string
 ): Promise<{ success: boolean; fulfillmentId?: string; autoFilled: boolean; txHash?: string; error?: string }> {
   try {
     // Check eligible inventory first
     const eligibleBtc = await getEligibleInventory(supabase);
     const canAutoFill = eligibleBtc >= btcAmount;
-    
+
     console.log(`Eligible BTC: ${eligibleBtc}, Required: ${btcAmount}, Can auto-fill: ${canAutoFill}`);
-    
-    // Create fulfillment order
+
+    // Create fulfillment order (FK expects profiles.id)
     const { data, error } = await supabase.from('fulfillment_orders').insert({
-      customer_id: customerId,
+      customer_id: customerProfileId,
       order_type: 'BUY_ORDER',
       destination_wallet_address: destinationAddress,
       btc_amount: btcAmount,
@@ -167,24 +167,24 @@ async function createAndFulfillBtcOrder(
     }).select().single();
 
     if (error) throw error;
-    
+
     console.log('Created fulfillment order:', data.id, 'status:', data.status);
 
     // If we can auto-fill, allocate inventory and mark as sent
     if (canAutoFill) {
       const allocated = await allocateBtcFifo(supabase, btcAmount, data.id);
-      
+
       if (allocated) {
         // Generate mock tx hash for party-to-party transfer
         const txHash = `p2p_${crypto.randomUUID().replace(/-/g, '').slice(0, 32)}`;
-        
+
         // Mark fulfillment as SENT
         await supabase.from('fulfillment_orders').update({
           status: 'SENT',
           tx_hash: txHash,
           sent_at: new Date().toISOString(),
         }).eq('id', data.id);
-        
+
         // Update swap order to COMPLETED
         await supabase.from('customer_swap_orders').update({
           status: 'COMPLETED',
@@ -192,21 +192,7 @@ async function createAndFulfillBtcOrder(
           inventory_allocated: true,
           completed_at: new Date().toISOString(),
         }).eq('id', swapOrderId);
-        
-        // Update daily BTC sends
-        const today = new Date().toISOString().split('T')[0];
-        await supabase.rpc('update_daily_btc_sends', { 
-          p_date: today, 
-          p_btc_amount: btcAmount 
-        }).catch(() => {
-          // If RPC doesn't exist, try direct upsert
-          supabase.from('daily_btc_sends').upsert({
-            send_date: today,
-            total_btc_sent: btcAmount,
-            transaction_count: 1,
-          }, { onConflict: 'send_date' });
-        });
-        
+
         console.log('Auto-filled order with tx_hash:', txHash);
         return { success: true, fulfillmentId: data.id, autoFilled: true, txHash };
       }
@@ -294,19 +280,19 @@ serve(async (req) => {
     }
 
     // Get profile - by user_id for Supabase users, by email for Dynamic users
-    let profile: { kyc_status: string; btc_address: string | null; usdc_address: string | null; user_id: string } | null = null;
-    
+    let profile: { id: string; kyc_status: string; btc_address: string | null; usdc_address: string | null; user_id: string } | null = null;
+
     if (userId) {
       const { data } = await supabase
         .from('profiles')
-        .select('kyc_status, btc_address, usdc_address, user_id')
+        .select('id, kyc_status, btc_address, usdc_address, user_id')
         .eq('user_id', userId)
         .single();
       profile = data;
     } else if (userEmail) {
       const { data } = await supabase
         .from('profiles')
-        .select('kyc_status, btc_address, usdc_address, user_id')
+        .select('id, kyc_status, btc_address, usdc_address, user_id')
         .eq('email', userEmail)
         .single();
       profile = data;
@@ -320,8 +306,10 @@ serve(async (req) => {
       });
     }
 
-    // Ensure userId is set (from profile if found via email)
+    // auth user id for swap orders + audit
     const customerId = userId || profile.user_id;
+    // profile.id for fulfillment_orders FK
+    const customerProfileId = profile.id;
 
     const body: TransferRequest = await req.json();
     const { quoteId, type, signature, userBtcAddress, userEthAddress, bankAccountId, voucherCode, usdcAmount, btcAmount, btcPrice, feeUsdc } = body;
@@ -390,12 +378,30 @@ serve(async (req) => {
           btcAmountToSend,
           usdcAmountCharged,
           priceUsed,
-          customerId,
+          customerProfileId,
           order.id
         );
         
+        // If fulfillment creation failed, mark swap order failed and return error
+        if (!fulfillmentResult.success) {
+          await supabase.from('customer_swap_orders').update({
+            status: 'FAILED',
+            failed_reason: fulfillmentResult.error || 'Fulfillment creation failed',
+          }).eq('id', order.id);
+
+          return new Response(JSON.stringify({
+            success: false,
+            orderId: order.order_id,
+            status: 'FAILED',
+            error: fulfillmentResult.error || 'Fulfillment creation failed',
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         // Update swap order status based on result
-        if (!fulfillmentResult.autoFilled && fulfillmentResult.success) {
+        if (!fulfillmentResult.autoFilled) {
           await supabase.from('customer_swap_orders').update({
             status: 'PROCESSING',
           }).eq('id', order.id);
@@ -413,7 +419,7 @@ serve(async (req) => {
             btc_amount: btcAmountToSend,
             usdc_amount: usdcAmountCharged,
             btc_price: priceUsed,
-            fulfillment_created: fulfillmentResult.success,
+            fulfillment_created: true,
             fulfillment_id: fulfillmentResult.fulfillmentId,
             auto_filled: fulfillmentResult.autoFilled,
             tx_hash: fulfillmentResult.txHash,
@@ -423,12 +429,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           orderId: order.order_id,
-          status: fulfillmentResult.autoFilled ? 'COMPLETED' : (fulfillmentResult.success ? 'PROCESSING' : 'PENDING'),
-          message: fulfillmentResult.autoFilled 
+          status: fulfillmentResult.autoFilled ? 'COMPLETED' : 'PROCESSING',
+          message: fulfillmentResult.autoFilled
             ? 'BTC purchase completed! Your BTC has been sent.'
-            : (fulfillmentResult.success 
-              ? 'BTC purchase submitted. Your order is being processed.'
-              : 'BTC purchase recorded. Awaiting admin processing.'),
+            : 'BTC purchase submitted. Your order is being processed.',
           btcAmount: btcAmountToSend,
           usdcAmount: usdcAmountCharged,
           btcPrice: priceUsed,
