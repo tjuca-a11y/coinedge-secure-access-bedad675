@@ -125,10 +125,36 @@ serve(async (req) => {
     const btcAddress = walletAddresses.find(w => w.chain === 'BTC')?.address;
     const ethAddress = walletAddresses.find(w => w.chain === 'ETH')?.address;
 
+    // If not found by Dynamic ID, check by email (user may have signed up before via email/password)
+    if (!supabaseUser && email) {
+      supabaseUser = existingUsers?.users?.find(
+        u => u.email?.toLowerCase() === email.toLowerCase()
+      );
+
+      // Link the Dynamic account to the existing email user
+      if (supabaseUser) {
+        console.log('Found existing user by email, linking Dynamic account:', supabaseUser.id);
+        await supabase.auth.admin.updateUserById(supabaseUser.id, {
+          user_metadata: {
+            ...supabaseUser.user_metadata,
+            dynamic_user_id: dynamicUserId,
+            wallet_btc: btcAddress,
+            wallet_eth: ethAddress,
+          },
+        });
+
+        // Sync wallet addresses to profile
+        await supabase.from('profiles').update({
+          btc_address: btcAddress || supabaseUser.user_metadata?.wallet_btc,
+          usdc_address: ethAddress || supabaseUser.user_metadata?.wallet_eth,
+        }).eq('user_id', supabaseUser.id);
+      }
+    }
+
     if (!supabaseUser) {
       // Create new Supabase user linked to Dynamic
       const userEmail = email || `${dynamicUserId}@dynamic.coinedge.io`;
-      
+
       const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
         email: userEmail,
         email_confirm: true, // Auto-confirm since they're authenticated via Dynamic
@@ -141,7 +167,7 @@ serve(async (req) => {
 
       if (createError) {
         console.error('Error creating user:', createError);
-        return new Response(JSON.stringify({ error: 'Failed to create user' }), {
+        return new Response(JSON.stringify({ error: 'Failed to create user', details: createError.message }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -162,6 +188,7 @@ serve(async (req) => {
       await supabase.auth.admin.updateUserById(supabaseUser.id, {
         user_metadata: {
           ...supabaseUser.user_metadata,
+          dynamic_user_id: dynamicUserId,
           wallet_btc: btcAddress,
           wallet_eth: ethAddress,
         },
