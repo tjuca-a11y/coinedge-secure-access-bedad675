@@ -28,6 +28,7 @@ interface DynamicWalletContextType {
   isLoading: boolean;
   isConfigured: boolean;
   isWalletInitializing: boolean;
+  sdkHasLoaded: boolean;
   
   // User state from Dynamic
   dynamicUser: any;
@@ -58,6 +59,7 @@ const defaultContextValue: DynamicWalletContextType = {
   isLoading: false,
   isConfigured: false,
   isWalletInitializing: false,
+  sdkHasLoaded: true, // Default to true so it doesn't block when Dynamic isn't configured
   dynamicUser: null,
   isAuthenticated: false,
   syncedProfile: null,
@@ -301,6 +303,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
         isLoading,
         isConfigured: true,
         isWalletInitializing,
+        sdkHasLoaded,
         dynamicUser,
         isAuthenticated,
         syncedProfile,
