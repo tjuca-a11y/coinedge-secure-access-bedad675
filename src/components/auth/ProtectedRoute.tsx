@@ -15,13 +15,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireKyc = false,
 }) => {
   const { user, loading, isKycApproved } = useAuth();
-  const { isAuthenticated, isWalletInitializing, isConfigured } = useDynamicWallet();
+  const { isAuthenticated, isWalletInitializing, isConfigured, sdkHasLoaded } = useDynamicWallet();
   const location = useLocation();
 
   // User is authenticated if they have either Supabase OR Dynamic session
   const isLoggedIn = !!user || isAuthenticated;
 
-  if (loading) {
+  // Wait for BOTH Supabase and Dynamic SDK to finish loading
+  const isDynamicLoading = isConfigured && !sdkHasLoaded;
+  const isLoading = loading || isDynamicLoading;
+
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
