@@ -289,9 +289,14 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
 
     setIsLoading(true);
     try {
+      // Try Supabase session first, then fall back to Dynamic auth token
       const { data: { session } } = await supabase.auth.getSession();
+      const dynamicToken = getAuthToken();
       
-      if (!session) {
+      const authToken = session?.access_token || dynamicToken;
+      
+      if (!authToken) {
+        console.warn('No auth token available for balance fetch');
         setIsLoading(false);
         return;
       }
@@ -300,15 +305,18 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wallet-balances`,
         {
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${authToken}`,
           },
         }
       );
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Balance fetch result:', data);
         setBtcBalance(data.btc || 0);
         setUsdcBalance(data.usdc || 0);
+      } else {
+        console.error('Balance fetch failed:', response.status);
       }
     } catch (error) {
       console.error('Error fetching balances:', error);
