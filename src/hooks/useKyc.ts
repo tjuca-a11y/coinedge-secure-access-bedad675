@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDynamicWallet } from '@/contexts/DynamicWalletContext';
+import { getAuthToken } from '@dynamic-labs/sdk-react-core';
 
 export interface KycFormData {
   full_name: string;
@@ -114,7 +115,27 @@ export const useKyc = () => {
     setError(null);
 
     try {
+      // Determine which auth token to use
+      let authToken: string | null = null;
+      let requestBody: Record<string, unknown> = { action: 'create_identity_token' };
+      
+      // Check for Supabase session first
       const { data: session } = await supabase.auth.getSession();
+      
+      if (session.session?.access_token) {
+        // Use Supabase auth
+        authToken = session.session.access_token;
+      } else if (isDynamicAuthenticated && syncedProfile) {
+        // Use Dynamic Labs auth
+        authToken = getAuthToken();
+        // Include userId for Dynamic auth
+        requestBody.userId = syncedProfile.userId;
+      }
+      
+      if (!authToken) {
+        setError('No valid authentication token');
+        return false;
+      }
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-identity`,
@@ -122,9 +143,9 @@ export const useKyc = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.session?.access_token}`,
+            Authorization: `Bearer ${authToken}`,
           },
-          body: JSON.stringify({ action: 'create_identity_token' }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -152,7 +173,7 @@ export const useKyc = () => {
     } finally {
       setLoading(false);
     }
-  }, [effectiveUserId]);
+  }, [effectiveUserId, isDynamicAuthenticated, syncedProfile]);
 
   // Handle verification completion from Plaid
   const handleVerificationComplete = useCallback(async (
@@ -166,7 +187,29 @@ export const useKyc = () => {
     setError(null);
 
     try {
+      // Determine which auth token to use
+      let authToken: string | null = null;
+      let requestBody: Record<string, unknown> = {
+        action: 'handle_verification_result',
+        identity_verification_id: verificationId,
+      };
+      
+      // Check for Supabase session first
       const { data: session } = await supabase.auth.getSession();
+      
+      if (session.session?.access_token) {
+        // Use Supabase auth
+        authToken = session.session.access_token;
+      } else if (isDynamicAuthenticated && syncedProfile) {
+        // Use Dynamic Labs auth
+        authToken = getAuthToken();
+        // Include userId for Dynamic auth
+        requestBody.userId = syncedProfile.userId;
+      }
+      
+      if (!authToken) {
+        return { success: false, error: 'No valid authentication token' };
+      }
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-identity`,
@@ -174,12 +217,9 @@ export const useKyc = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.session?.access_token}`,
+            Authorization: `Bearer ${authToken}`,
           },
-          body: JSON.stringify({
-            action: 'handle_verification_result',
-            identity_verification_id: verificationId,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -214,7 +254,7 @@ export const useKyc = () => {
     } finally {
       setLoading(false);
     }
-  }, [effectiveUserId, refreshProfile]);
+  }, [effectiveUserId, refreshProfile, isDynamicAuthenticated, syncedProfile]);
 
   // Reset KYC status for retry (clears rejection and allows new attempt)
   const initiateRetry = useCallback(async (): Promise<boolean> => {
