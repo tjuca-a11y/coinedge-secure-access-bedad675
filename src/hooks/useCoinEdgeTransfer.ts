@@ -28,6 +28,13 @@ interface TransferRequest {
   quoteId: string;
   type: TransferType;
   signature?: string;
+  // Quote data to include in transfer
+  usdcAmount?: number;
+  btcAmount?: number;
+  btcPrice?: number;
+  feeUsdc?: number;
+  bankAccountId?: string;
+  voucherCode?: string;
 }
 
 interface TransferResult {
@@ -136,10 +143,18 @@ export const useCoinEdgeTransfer = () => {
             'Authorization': authHeader,
           },
           body: JSON.stringify({
-            ...request,
+            quoteId: request.quoteId,
+            type: request.type,
             signature,
             userBtcAddress: btcWallet?.address,
             userEthAddress: ethWallet?.address,
+            // Pass quote data for accurate order recording
+            usdcAmount: request.usdcAmount,
+            btcAmount: request.btcAmount,
+            btcPrice: request.btcPrice,
+            feeUsdc: request.feeUsdc,
+            bankAccountId: request.bankAccountId,
+            voucherCode: request.voucherCode,
           }),
         }
       );
