@@ -52,8 +52,17 @@ verify_jwt = false
 [functions.wallet-balances]
 verify_jwt = false
 
+[functions.monitor-btc-transactions]
+verify_jwt = false
+
 # Cron job to run fulfillment queue processing every 5 minutes
 [[cron]]
 schedule = "*/5 * * * *"
 endpoint = "/functions/v1/process-fulfillment-queue"
+body = "{}"
+
+# Cron job to monitor BTC transactions every 2 minutes
+[[cron]]
+schedule = "*/2 * * * *"
+endpoint = "/functions/v1/monitor-btc-transactions"
 body = "{}"
