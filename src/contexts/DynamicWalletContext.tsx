@@ -137,7 +137,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
   useEffect(() => {
     const syncToSupabase = async () => {
       const authToken = getAuthToken();
-      if (dynamicUser && authToken && wallets.length > 0) {
+      if (dynamicUser && authToken) {
         try {
           // Call edge function to validate Dynamic JWT and create/sync Supabase user
           const response = await fetch(
@@ -151,7 +151,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
               body: JSON.stringify({
                 dynamicUserId: dynamicUser.userId,
                 email: dynamicUser.email,
-                walletAddresses: wallets.map(w => ({ address: w.address, chain: w.chain })),
+                walletAddresses: wallets.map((w) => ({ address: w.address, chain: w.chain })),
               }),
             }
           );
