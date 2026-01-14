@@ -35,7 +35,7 @@ async function verifyDynamicToken(token: string, environmentId: string): Promise
   try {
     const JWKS = await getDynamicJWKS(environmentId);
     const { payload } = await jose.jwtVerify(token, JWKS, {
-      issuer: `app.dynamic.xyz/${environmentId}`,
+      issuer: `https://app.dynamic.xyz/${environmentId}`,
     });
     return payload;
   } catch (error) {
