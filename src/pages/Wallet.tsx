@@ -52,7 +52,7 @@ const calculatePerformance = (data: typeof accountPerformanceData) => {
 const currentBtcPrice = 93327.91;
 
 const Wallet: React.FC = () => {
-  const { profile: supabaseProfile, isKycApproved: supabaseKycApproved } = useAuth();
+  const { user: supabaseUser, profile: supabaseProfile, isKycApproved: supabaseKycApproved } = useAuth();
   const { 
     isConnected, 
     btcWallet, 
@@ -73,28 +73,41 @@ const Wallet: React.FC = () => {
   const [cashOutModalOpen, setCashOutModalOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
   
-  // For Dynamic users, fetch profile separately
+  // For Dynamic users, fetch profile separately (so KYC can work even if a Supabase session/profile exists from another user)
   const [dynamicProfile, setDynamicProfile] = useState<Profile | null>(null);
   
   useEffect(() => {
     const fetchDynamicProfile = async () => {
-      if (isDynamicAuthenticated && syncedProfile?.userId && !supabaseProfile) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', syncedProfile.userId)
-          .maybeSingle();
-        setDynamicProfile(data);
-      }
-    };
-    fetchDynamicProfile();
-  }, [isDynamicAuthenticated, syncedProfile?.userId, supabaseProfile]);
-  
-  // Use whichever profile is available
-  const profile = supabaseProfile || dynamicProfile;
-  const isKycApproved = supabaseKycApproved || dynamicProfile?.kyc_status === 'approved';
-  
+      if (!isDynamicAuthenticated || !syncedProfile?.userId) return;
 
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', syncedProfile.userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[Wallet] failed to fetch dynamic profile', error);
+        return;
+      }
+
+      setDynamicProfile(data);
+    };
+
+    fetchDynamicProfile();
+  }, [isDynamicAuthenticated, syncedProfile?.userId]);
+
+  const isSupabaseSessionForDynamicUser =
+    !!supabaseUser?.id && !!syncedProfile?.userId && supabaseUser.id === syncedProfile.userId;
+
+  // Prefer the Dynamic-linked profile when the user is authenticated via Dynamic.
+  const profile = isDynamicAuthenticated
+    ? (dynamicProfile || (isSupabaseSessionForDynamicUser ? supabaseProfile : null))
+    : supabaseProfile;
+
+  const isKycApproved = isDynamicAuthenticated
+    ? (profile?.kyc_status === 'approved')
+    : supabaseKycApproved;
   const handleRefresh = useCallback(async () => {
     await refreshBalances();
     setLastRefresh(Date.now());
