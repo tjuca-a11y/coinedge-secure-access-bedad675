@@ -25,7 +25,7 @@ async function getDynamicJWKS(environmentId: string): Promise<jose.JWTVerifyGetK
     return cachedJWKS;
   }
 
-  const jwksUrl = `https://app.dynamic.xyz/api/v0/sdk/${environmentId}/.well-known/jwks`;
+  const jwksUrl = `https://app.dynamicauth.com/api/v0/sdk/${environmentId}/.well-known/jwks`;
   cachedJWKS = jose.createRemoteJWKSet(new URL(jwksUrl));
   jwksCacheTime = now;
   return cachedJWKS;
@@ -34,8 +34,9 @@ async function getDynamicJWKS(environmentId: string): Promise<jose.JWTVerifyGetK
 async function verifyDynamicToken(token: string, environmentId: string): Promise<jose.JWTPayload | null> {
   try {
     const JWKS = await getDynamicJWKS(environmentId);
+    // Dynamic Labs uses app.dynamicauth.com as the issuer
     const { payload } = await jose.jwtVerify(token, JWKS, {
-      issuer: `https://app.dynamic.xyz/${environmentId}`,
+      issuer: `app.dynamicauth.com/${environmentId}`,
     });
     return payload;
   } catch (error) {
