@@ -24,6 +24,11 @@ import IdentityVerification from "./pages/IdentityVerification";
 import ProfileSettings from "./pages/settings/ProfileSettings";
 import SecuritySettings from "./pages/settings/SecuritySettings";
 import PaymentMethodsSettings from "./pages/settings/PaymentMethodsSettings";
+import CryptoWalletsSettings from "./pages/settings/CryptoWalletsSettings";
+import NotificationsSettings from "./pages/settings/NotificationsSettings";
+import LimitsSettings from "./pages/settings/LimitsSettings";
+import DevicesSettings from "./pages/settings/DevicesSettings";
+import DataPrivacySettings from "./pages/settings/DataPrivacySettings";
 import Redeem from "./pages/Redeem";
 import NotFound from "./pages/NotFound";
 
@@ -155,6 +160,11 @@ const App = () => (
                     <Route path="/settings/security" element={<ProtectedRoute><SecuritySettings /></ProtectedRoute>} />
                     <Route path="/settings/payment-methods" element={<ProtectedRoute><PaymentMethodsSettings /></ProtectedRoute>} />
                     <Route path="/settings/identity-verification" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
+                    <Route path="/settings/crypto-wallets" element={<ProtectedRoute><CryptoWalletsSettings /></ProtectedRoute>} />
+                    <Route path="/settings/notifications" element={<ProtectedRoute><NotificationsSettings /></ProtectedRoute>} />
+                    <Route path="/settings/limits" element={<ProtectedRoute><LimitsSettings /></ProtectedRoute>} />
+                    <Route path="/settings/devices" element={<ProtectedRoute><DevicesSettings /></ProtectedRoute>} />
+                    <Route path="/settings/data-privacy" element={<ProtectedRoute><DataPrivacySettings /></ProtectedRoute>} />
                     <Route path="/redeem" element={<ProtectedRoute><Redeem /></ProtectedRoute>} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
