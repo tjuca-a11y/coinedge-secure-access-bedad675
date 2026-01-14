@@ -123,31 +123,31 @@ const Settings: React.FC = () => {
       icon: <Wallet className="h-5 w-5 text-primary" />,
       title: "Crypto Wallets",
       description: "View internal balances and add external wallet addresses",
-      onClick: () => toast.info("Crypto wallets coming soon"),
+      onClick: () => navigate("/settings/crypto-wallets"),
     },
     {
       icon: <Bell className="h-5 w-5 text-primary" />,
       title: "Notifications",
       description: "Control how you receive updates and alerts",
-      onClick: () => toast.info("Notification settings coming soon"),
+      onClick: () => navigate("/settings/notifications"),
     },
     {
       icon: <TrendingUp className="h-5 w-5 text-primary" />,
       title: "Limits & Compliance",
       description: "Monitor your transaction limits and compliance status",
-      onClick: () => toast.info("Limits info coming soon"),
+      onClick: () => navigate("/settings/limits"),
     },
     {
       icon: <Monitor className="h-5 w-5 text-primary" />,
       title: "Devices & Sessions",
       description: "Manage active sessions and trusted devices",
-      onClick: () => toast.info("Device management coming soon"),
+      onClick: () => navigate("/settings/devices"),
     },
     {
       icon: <Database className="h-5 w-5 text-primary" />,
       title: "Data & Privacy",
       description: "Download your data and manage privacy settings",
-      onClick: () => toast.info("Privacy settings coming soon"),
+      onClick: () => navigate("/settings/data-privacy"),
     },
   ];
 
