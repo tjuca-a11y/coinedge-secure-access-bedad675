@@ -1,46 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDynamicWallet } from '@/contexts/DynamicWalletContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
-
-type KycStatus = Database['public']['Enums']['kyc_status'];
 
 export const KycBanner: React.FC = () => {
   const { isKycApproved: supabaseKycApproved, kycStatus: supabaseKycStatus } = useAuth();
   const { isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
 
-  const [dynamicKycStatus, setDynamicKycStatus] = useState<KycStatus | null>(null);
-
-  useEffect(() => {
-    const fetchDynamicKyc = async () => {
-      if (!isDynamicAuthenticated || !syncedProfile?.userId) {
-        setDynamicKycStatus(null);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('kyc_status')
-        .eq('user_id', syncedProfile.userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[KycBanner] failed to fetch dynamic kyc status', error);
-        return;
-      }
-
-      setDynamicKycStatus(data?.kyc_status ?? null);
-    };
-
-    fetchDynamicKyc();
-  }, [isDynamicAuthenticated, syncedProfile?.userId]);
-
-  const effectiveKycStatus = isDynamicAuthenticated ? dynamicKycStatus : supabaseKycStatus;
+  // Use centralized KYC status from syncedProfile for Dynamic users
+  const effectiveKycStatus = isDynamicAuthenticated 
+    ? (syncedProfile?.kycStatus || 'not_started') 
+    : supabaseKycStatus;
+  
   const isKycApproved = isDynamicAuthenticated
-    ? dynamicKycStatus === 'approved'
+    ? syncedProfile?.kycStatus === 'approved'
     : supabaseKycApproved;
 
   if (isKycApproved) return null;

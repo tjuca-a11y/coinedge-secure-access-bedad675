@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,10 +7,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, CheckCircle, FileText, Camera, Home, Upload } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
-import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
-
-type KycStatus = Database['public']['Enums']['kyc_status'];
 
 interface VerificationTier {
   tier: number;
@@ -33,27 +29,10 @@ const IdentityVerification: React.FC = () => {
   const { kycStatus: supabaseKycStatus } = useAuth();
   const { isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
   
-  const [dynamicKycStatus, setDynamicKycStatus] = useState<KycStatus | null>(null);
-  
-  // Fetch KYC status for Dynamic users
-  useEffect(() => {
-    const fetchDynamicKycStatus = async () => {
-      if (isDynamicAuthenticated && syncedProfile?.userId) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('kyc_status')
-          .eq('user_id', syncedProfile.userId)
-          .maybeSingle();
-        if (data) {
-          setDynamicKycStatus(data.kyc_status);
-        }
-      }
-    };
-    fetchDynamicKycStatus();
-  }, [isDynamicAuthenticated, syncedProfile?.userId]);
-  
-  // Use Dynamic KYC status if available, otherwise fall back to Supabase auth
-  const kycStatus = dynamicKycStatus || supabaseKycStatus;
+  // Use centralized KYC status from syncedProfile for Dynamic users
+  const kycStatus = isDynamicAuthenticated 
+    ? (syncedProfile?.kycStatus || 'not_started') 
+    : supabaseKycStatus;
 
   const handleStartVerification = () => {
     console.log("[IdentityVerification] Start Verification clicked");

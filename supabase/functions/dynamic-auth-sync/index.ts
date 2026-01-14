@@ -210,6 +210,15 @@ serve(async (req) => {
       });
     }
 
+    // Fetch KYC status from profile
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('kyc_status')
+      .eq('user_id', supabaseUser.id)
+      .maybeSingle();
+
+    const kycStatus = profileData?.kyc_status || 'not_started';
+
     // Return success - the frontend will use Dynamic auth state
     // Supabase session is optional for this flow since Dynamic handles auth
     return new Response(JSON.stringify({
@@ -218,6 +227,7 @@ serve(async (req) => {
       email: supabaseUser.email,
       btcAddress,
       ethAddress,
+      kycStatus,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
