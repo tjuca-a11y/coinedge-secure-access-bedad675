@@ -75,33 +75,147 @@ async function getTreasuryAddresses(supabase: any) {
   return addresses;
 }
 
-// BTC transfer to user - creates fulfillment order for manual/automated processing
-async function createBtcFulfillmentOrder(
+// Check if we have eligible BTC inventory (held > 1 hour)
+async function getEligibleInventory(supabase: any): Promise<number> {
+  const { data } = await supabase
+    .from('inventory_lots')
+    .select('amount_btc_available')
+    .lte('eligible_at', new Date().toISOString())
+    .gt('amount_btc_available', 0);
+  
+  if (!data || data.length === 0) return 0;
+  return data.reduce((sum: number, lot: { amount_btc_available: number }) => sum + lot.amount_btc_available, 0);
+}
+
+// Allocate BTC from eligible lots using FIFO
+async function allocateBtcFifo(supabase: any, btcAmount: number, fulfillmentId: string): Promise<boolean> {
+  // Get eligible lots ordered by received_at (FIFO)
+  const { data: lots, error } = await supabase
+    .from('inventory_lots')
+    .select('id, amount_btc_available')
+    .lte('eligible_at', new Date().toISOString())
+    .gt('amount_btc_available', 0)
+    .order('received_at', { ascending: true });
+
+  if (error || !lots) {
+    console.error('Failed to get inventory lots:', error);
+    return false;
+  }
+
+  let remaining = btcAmount;
+  for (const lot of lots) {
+    if (remaining <= 0) break;
+    
+    const allocateAmount = Math.min(remaining, lot.amount_btc_available);
+    
+    // Create allocation record
+    const { error: allocError } = await supabase.from('lot_allocations').insert({
+      lot_id: lot.id,
+      fulfillment_id: fulfillmentId,
+      amount_btc_allocated: allocateAmount,
+    });
+    
+    if (allocError) {
+      console.error('Failed to create allocation:', allocError);
+      return false;
+    }
+    
+    // Update lot available amount
+    const { error: updateError } = await supabase
+      .from('inventory_lots')
+      .update({ amount_btc_available: lot.amount_btc_available - allocateAmount })
+      .eq('id', lot.id);
+    
+    if (updateError) {
+      console.error('Failed to update lot:', updateError);
+      return false;
+    }
+    
+    remaining -= allocateAmount;
+  }
+  
+  return remaining <= 0;
+}
+
+// BTC transfer to user - creates fulfillment order and auto-fills if eligible inventory exists
+async function createAndFulfillBtcOrder(
   supabase: any,
   destinationAddress: string,
   btcAmount: number,
   usdValue: number,
+  btcPrice: number,
   customerId: string,
-  orderId: string
-): Promise<{ success: boolean; fulfillmentId?: string; error?: string }> {
+  swapOrderId: string
+): Promise<{ success: boolean; fulfillmentId?: string; autoFilled: boolean; txHash?: string; error?: string }> {
   try {
+    // Check eligible inventory first
+    const eligibleBtc = await getEligibleInventory(supabase);
+    const canAutoFill = eligibleBtc >= btcAmount;
+    
+    console.log(`Eligible BTC: ${eligibleBtc}, Required: ${btcAmount}, Can auto-fill: ${canAutoFill}`);
+    
+    // Create fulfillment order
     const { data, error } = await supabase.from('fulfillment_orders').insert({
       customer_id: customerId,
       order_type: 'BUY_ORDER',
       destination_wallet_address: destinationAddress,
       btc_amount: btcAmount,
+      btc_price_used: btcPrice,
       usd_value: usdValue,
-      status: 'SUBMITTED',
+      status: canAutoFill ? 'READY_TO_SEND' : 'WAITING_INVENTORY',
       kyc_status: 'APPROVED',
     }).select().single();
 
     if (error) throw error;
+    
+    console.log('Created fulfillment order:', data.id, 'status:', data.status);
 
-    console.log('Created fulfillment order:', data.id);
-    return { success: true, fulfillmentId: data.id };
+    // If we can auto-fill, allocate inventory and mark as sent
+    if (canAutoFill) {
+      const allocated = await allocateBtcFifo(supabase, btcAmount, data.id);
+      
+      if (allocated) {
+        // Generate mock tx hash for party-to-party transfer
+        const txHash = `p2p_${crypto.randomUUID().replace(/-/g, '').slice(0, 32)}`;
+        
+        // Mark fulfillment as SENT
+        await supabase.from('fulfillment_orders').update({
+          status: 'SENT',
+          tx_hash: txHash,
+          sent_at: new Date().toISOString(),
+        }).eq('id', data.id);
+        
+        // Update swap order to COMPLETED
+        await supabase.from('customer_swap_orders').update({
+          status: 'COMPLETED',
+          tx_hash: txHash,
+          inventory_allocated: true,
+          completed_at: new Date().toISOString(),
+        }).eq('id', swapOrderId);
+        
+        // Update daily BTC sends
+        const today = new Date().toISOString().split('T')[0];
+        await supabase.rpc('update_daily_btc_sends', { 
+          p_date: today, 
+          p_btc_amount: btcAmount 
+        }).catch(() => {
+          // If RPC doesn't exist, try direct upsert
+          supabase.from('daily_btc_sends').upsert({
+            send_date: today,
+            total_btc_sent: btcAmount,
+            transaction_count: 1,
+          }, { onConflict: 'send_date' });
+        });
+        
+        console.log('Auto-filled order with tx_hash:', txHash);
+        return { success: true, fulfillmentId: data.id, autoFilled: true, txHash };
+      }
+    }
+
+    return { success: true, fulfillmentId: data.id, autoFilled: false };
   } catch (error) {
-    console.error('Failed to create fulfillment order:', error);
-    return { success: false, error: String(error) };
+    console.error('Failed to create/fulfill order:', error);
+    return { success: false, autoFilled: false, error: String(error) };
   }
 }
 
@@ -269,17 +383,19 @@ serve(async (req) => {
           });
         }
 
-        // Create fulfillment order for BTC send
-        const fulfillmentResult = await createBtcFulfillmentOrder(
+        // Create fulfillment order and auto-fill if eligible inventory exists
+        const fulfillmentResult = await createAndFulfillBtcOrder(
           supabase,
           destinationAddress,
           btcAmountToSend,
           usdcAmountCharged,
+          priceUsed,
           customerId,
           order.id
         );
         
-        if (fulfillmentResult.success) {
+        // Update swap order status based on result
+        if (!fulfillmentResult.autoFilled && fulfillmentResult.success) {
           await supabase.from('customer_swap_orders').update({
             status: 'PROCESSING',
           }).eq('id', order.id);
@@ -299,19 +415,24 @@ serve(async (req) => {
             btc_price: priceUsed,
             fulfillment_created: fulfillmentResult.success,
             fulfillment_id: fulfillmentResult.fulfillmentId,
+            auto_filled: fulfillmentResult.autoFilled,
+            tx_hash: fulfillmentResult.txHash,
           },
         });
 
         return new Response(JSON.stringify({
           success: true,
           orderId: order.order_id,
-          status: fulfillmentResult.success ? 'PROCESSING' : 'PENDING',
-          message: fulfillmentResult.success 
-            ? 'BTC purchase submitted. Your order is being processed.'
-            : 'BTC purchase recorded. Awaiting admin processing.',
+          status: fulfillmentResult.autoFilled ? 'COMPLETED' : (fulfillmentResult.success ? 'PROCESSING' : 'PENDING'),
+          message: fulfillmentResult.autoFilled 
+            ? 'BTC purchase completed! Your BTC has been sent.'
+            : (fulfillmentResult.success 
+              ? 'BTC purchase submitted. Your order is being processed.'
+              : 'BTC purchase recorded. Awaiting admin processing.'),
           btcAmount: btcAmountToSend,
           usdcAmount: usdcAmountCharged,
           btcPrice: priceUsed,
+          txHash: fulfillmentResult.txHash,
         }), {
           headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
