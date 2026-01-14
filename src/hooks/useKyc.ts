@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDynamicWallet } from '@/contexts/DynamicWalletContext';
 
 export interface KycFormData {
   full_name: string;
@@ -35,6 +36,12 @@ const KYC_COOLDOWN_HOURS = 24;
 
 export const useKyc = () => {
   const { user, profile, refreshProfile } = useAuth();
+  const { syncedProfile, isAuthenticated: isDynamicAuthenticated } = useDynamicWallet();
+  
+  // Determine the effective user ID - prefer Supabase auth, fall back to Dynamic synced profile
+  const effectiveUserId = user?.id || syncedProfile?.userId;
+  const isAuthenticated = !!user || isDynamicAuthenticated;
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
@@ -60,7 +67,7 @@ export const useKyc = () => {
 
   // Submit personal info to prefill Plaid Identity
   const submitPersonalInfo = async (data: KycFormData) => {
-    if (!user) {
+    if (!effectiveUserId) {
       setError('User not authenticated');
       return false;
     }
@@ -82,7 +89,7 @@ export const useKyc = () => {
           country: data.country,
           phone: data.phone,
         })
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
 
       if (updateError) throw updateError;
 
@@ -98,7 +105,7 @@ export const useKyc = () => {
 
   // Create Plaid Identity verification link token
   const createIdentityVerificationToken = useCallback(async (): Promise<boolean> => {
-    if (!user) {
+    if (!effectiveUserId) {
       setError('User not authenticated');
       return false;
     }
@@ -145,13 +152,13 @@ export const useKyc = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   // Handle verification completion from Plaid
   const handleVerificationComplete = useCallback(async (
     verificationId: string
   ): Promise<PlaidVerificationResultResponse> => {
-    if (!user) {
+    if (!effectiveUserId) {
       return { success: false, error: 'User not authenticated' };
     }
 
@@ -187,7 +194,7 @@ export const useKyc = () => {
           await supabase
             .from('profiles')
             .update({ kyc_retry_available_at: cooldownEnd.toISOString() })
-            .eq('user_id', user.id);
+            .eq('user_id', effectiveUserId);
         }
         
         await refreshProfile();
@@ -207,11 +214,11 @@ export const useKyc = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, refreshProfile]);
+  }, [effectiveUserId, refreshProfile]);
 
   // Reset KYC status for retry (clears rejection and allows new attempt)
   const initiateRetry = useCallback(async (): Promise<boolean> => {
-    if (!user) {
+    if (!effectiveUserId) {
       setError('User not authenticated');
       return false;
     }
@@ -233,7 +240,7 @@ export const useKyc = () => {
           kyc_rejection_reason: null,
           kyc_retry_available_at: null,
         })
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
 
       if (updateError) throw updateError;
 
@@ -245,11 +252,11 @@ export const useKyc = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, refreshProfile, cooldownInfo.isInCooldown]);
+  }, [effectiveUserId, refreshProfile, cooldownInfo.isInCooldown]);
 
   // Submit KYC for manual review (fallback when Plaid not configured)
   const submitKycForReview = async () => {
-    if (!user) {
+    if (!effectiveUserId) {
       setError('User not authenticated');
       return false;
     }
@@ -264,7 +271,7 @@ export const useKyc = () => {
           kyc_status: 'pending',
           kyc_submitted_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
 
       if (updateError) throw updateError;
 
@@ -280,7 +287,7 @@ export const useKyc = () => {
 
   // For demo purposes - simulate KYC approval
   const simulateKycApproval = async () => {
-    if (!user) {
+    if (!effectiveUserId) {
       setError('User not authenticated');
       return false;
     }
@@ -302,7 +309,7 @@ export const useKyc = () => {
           usdc_address: mockUsdcAddress,
           wallet_created_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
 
       if (updateError) throw updateError;
 
@@ -328,6 +335,8 @@ export const useKyc = () => {
     plaidLinkToken,
     identityVerificationId,
     cooldownInfo,
+    isAuthenticated,
+    effectiveUserId,
     submitPersonalInfo,
     createIdentityVerificationToken,
     handleVerificationComplete,

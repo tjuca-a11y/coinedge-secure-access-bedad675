@@ -10,6 +10,13 @@ interface WalletInfo {
   publicKey?: string;
 }
 
+interface SyncedProfile {
+  userId: string;
+  email: string;
+  btcAddress?: string;
+  ethAddress?: string;
+}
+
 interface DynamicWalletContextType {
   // Wallet state
   wallets: WalletInfo[];
@@ -25,6 +32,9 @@ interface DynamicWalletContextType {
   // User state from Dynamic
   dynamicUser: any;
   isAuthenticated: boolean;
+  
+  // Synced Supabase profile (from dynamic-auth-sync)
+  syncedProfile: SyncedProfile | null;
   
   // Actions
   disconnectWallet: () => Promise<void>;
@@ -50,6 +60,7 @@ const defaultContextValue: DynamicWalletContextType = {
   isWalletInitializing: false,
   dynamicUser: null,
   isAuthenticated: false,
+  syncedProfile: null,
   disconnectWallet: async () => console.warn('Dynamic SDK not configured'),
   signMessage: async () => null,
   syncWalletToProfile: async () => console.warn('Dynamic SDK not configured'),
@@ -75,6 +86,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
   const [usdcBalance, setUsdcBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isWalletInitializing, setIsWalletInitializing] = useState(false);
+  const [syncedProfile, setSyncedProfile] = useState<SyncedProfile | null>(null);
   
   // Derive isAuthenticated from user presence
   const isAuthenticated = !!dynamicUser;
@@ -145,6 +157,13 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
           if (response.ok) {
             const data = await response.json();
             console.log('Dynamic auth synced to Supabase:', data.userId);
+            // Store the synced profile info
+            setSyncedProfile({
+              userId: data.userId,
+              email: data.email,
+              btcAddress: data.btcAddress,
+              ethAddress: data.ethAddress,
+            });
           } else {
             const error = await response.json();
             console.error('Failed to sync Dynamic auth:', error);
@@ -166,6 +185,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
       setWallets([]);
       setBtcBalance(0);
       setUsdcBalance(0);
+      setSyncedProfile(null);
       toast.success('Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -283,6 +303,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
         isWalletInitializing,
         dynamicUser,
         isAuthenticated,
+        syncedProfile,
         disconnectWallet,
         signMessage,
         syncWalletToProfile,
