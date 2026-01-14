@@ -14,6 +14,58 @@ interface TransferRequest {
   userEthAddress?: string;
   bankAccountId?: string;
   voucherCode?: string;
+  usdcAmount?: number;
+  btcAmount?: number;
+  btcPrice?: number;
+  feeUsdc?: number;
+}
+
+// Helper to get CoinEdge treasury addresses from system_settings
+async function getTreasuryAddresses(supabase: any) {
+  const { data: settings } = await supabase
+    .from('system_settings')
+    .select('setting_key, setting_value')
+    .in('setting_key', ['coinedge_btc_address', 'coinedge_usdc_address']);
+  
+  const addresses: { btc?: string; usdc?: string } = {};
+  settings?.forEach((s: { setting_key: string; setting_value: string }) => {
+    if (s.setting_key === 'coinedge_btc_address') addresses.btc = s.setting_value;
+    if (s.setting_key === 'coinedge_usdc_address') addresses.usdc = s.setting_value;
+  });
+  
+  return addresses;
+}
+
+// Placeholder for direct blockchain BTC transfer (CoinEdge → User)
+// TODO: Implement with bitcoinjs-lib when treasury wallet is ready
+async function sendBtcToUser(
+  _destinationAddress: string,
+  _btcAmount: number,
+  _orderId: string
+): Promise<{ success: boolean; txHash?: string; error?: string }> {
+  // This will be implemented when:
+  // 1. CoinEdge treasury BTC address is configured
+  // 2. Private key is securely stored as COINEDGE_BTC_PRIVATE_KEY secret
+  // 3. bitcoinjs-lib is integrated for transaction signing
+  
+  console.log('sendBtcToUser: Treasury wallet not configured yet');
+  return {
+    success: false,
+    error: 'Treasury wallet not configured. BTC transfers pending admin setup.',
+  };
+}
+
+// Placeholder for monitoring incoming BTC transfers (User → CoinEdge)
+// TODO: Implement with Blockstream API webhook or polling
+async function monitorIncomingBtc(
+  _fromAddress: string,
+  _expectedAmount: number,
+  _orderId: string
+): Promise<{ detected: boolean; txHash?: string }> {
+  // This will poll Blockstream API for incoming transactions
+  // to the CoinEdge treasury address
+  console.log('monitorIncomingBtc: Monitoring not implemented yet');
+  return { detected: false };
 }
 
 serve(async (req) => {
@@ -70,7 +122,7 @@ serve(async (req) => {
     }
 
     const body: TransferRequest = await req.json();
-    const { quoteId, type, signature, userBtcAddress, userEthAddress, bankAccountId, voucherCode } = body;
+    const { quoteId, type, signature, userBtcAddress, userEthAddress, bankAccountId, voucherCode, usdcAmount, btcAmount, btcPrice, feeUsdc } = body;
 
     if (!quoteId || !type) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -93,12 +145,13 @@ serve(async (req) => {
     const orderId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
 
+    // Get CoinEdge treasury addresses from system_settings
+    const treasuryAddresses = await getTreasuryAddresses(supabase);
+
     // Process based on transfer type
     switch (type) {
       case 'BUY_BTC': {
-        // CoinEdge sends BTC to user's wallet
-        // In production: Call Fireblocks API (backend-only) to send from CoinEdge vault
-        
+        // CoinEdge sends BTC to user's wallet (direct blockchain transfer)
         const destinationAddress = userBtcAddress || profile.btc_address;
         if (!destinationAddress) {
           return new Response(JSON.stringify({ error: 'No BTC wallet address found' }), {
@@ -107,17 +160,42 @@ serve(async (req) => {
           });
         }
 
+        // Use amounts from quote
+        const btcAmountToSend = btcAmount || 0;
+        const usdcAmountCharged = usdcAmount || 0;
+        const priceUsed = btcPrice || 93500;
+        const fee = feeUsdc || 0;
+
         // Create order record
-        await supabase.from('customer_swap_orders').insert({
+        const { data: order, error: orderError } = await supabase.from('customer_swap_orders').insert({
           customer_id: userId,
           order_type: 'BUY_BTC',
-          usdc_amount: 0, // TODO: Get from quote
-          btc_amount: 0, // TODO: Get from quote
-          btc_price_at_order: 93500, // TODO: Get from quote
-          fee_usdc: 0,
+          usdc_amount: usdcAmountCharged,
+          btc_amount: btcAmountToSend,
+          btc_price_at_order: priceUsed,
+          fee_usdc: fee,
           status: 'PENDING',
           destination_address: destinationAddress,
-        });
+        }).select().single();
+
+        if (orderError) {
+          console.error('Failed to create order:', orderError);
+          return new Response(JSON.stringify({ error: 'Failed to create order' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Attempt to send BTC (will fail gracefully if treasury not configured)
+        const transferResult = await sendBtcToUser(destinationAddress, btcAmountToSend, order.id);
+        
+        // Update order with transfer result
+        if (transferResult.success && transferResult.txHash) {
+          await supabase.from('customer_swap_orders').update({
+            status: 'PROCESSING',
+            tx_hash: transferResult.txHash,
+          }).eq('id', order.id);
+        }
 
         // Log audit event
         await supabase.from('audit_logs').insert({
@@ -128,16 +206,24 @@ serve(async (req) => {
           metadata: {
             quote_id: quoteId,
             destination: destinationAddress,
-            status: 'INITIATED',
+            btc_amount: btcAmountToSend,
+            usdc_amount: usdcAmountCharged,
+            transfer_initiated: transferResult.success,
+            tx_hash: transferResult.txHash,
+            status: transferResult.success ? 'TRANSFER_INITIATED' : 'AWAITING_TREASURY_CONFIG',
           },
         });
 
         return new Response(JSON.stringify({
           success: true,
-          orderId,
-          status: 'PENDING',
-          message: 'BTC purchase initiated. CoinEdge → Your Wallet transfer in progress.',
-          txHash: null, // Will be updated when on-chain tx completes
+          orderId: order.order_id,
+          status: transferResult.success ? 'PROCESSING' : 'PENDING',
+          message: transferResult.success 
+            ? 'BTC purchase initiated. Transaction broadcasting to network.'
+            : 'BTC purchase recorded. Transfer pending treasury configuration.',
+          txHash: transferResult.txHash || null,
+          btcAmount: btcAmountToSend,
+          usdcAmount: usdcAmountCharged,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -147,17 +233,40 @@ serve(async (req) => {
         // User sends BTC to CoinEdge wallet (requires user signature)
         // CoinEdge receives BTC and credits USDC to user
         
+        const btcAmountToReceive = btcAmount || 0;
+        const usdcAmountToCredit = usdcAmount || 0;
+        const priceUsed = btcPrice || 93500;
+        const fee = feeUsdc || 0;
+
+        // Check if treasury address is configured
+        if (!treasuryAddresses.btc) {
+          return new Response(JSON.stringify({ 
+            error: 'CoinEdge BTC receiving address not configured. Please contact support.' 
+          }), {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         // Create order record
-        await supabase.from('customer_swap_orders').insert({
+        const { data: order, error: orderError } = await supabase.from('customer_swap_orders').insert({
           customer_id: userId,
           order_type: 'SELL_BTC',
-          usdc_amount: 0, // TODO: Get from quote
-          btc_amount: 0, // TODO: Get from quote
-          btc_price_at_order: 93500,
-          fee_usdc: 0,
+          usdc_amount: usdcAmountToCredit,
+          btc_amount: btcAmountToReceive,
+          btc_price_at_order: priceUsed,
+          fee_usdc: fee,
           status: 'PENDING',
           source_usdc_address: userBtcAddress || profile.btc_address,
-        });
+        }).select().single();
+
+        if (orderError) {
+          console.error('Failed to create order:', orderError);
+          return new Response(JSON.stringify({ error: 'Failed to create order' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
 
         // Log audit event
         await supabase.from('audit_logs').insert({
@@ -168,16 +277,21 @@ serve(async (req) => {
           metadata: {
             quote_id: quoteId,
             user_signed: true,
+            btc_amount: btcAmountToReceive,
+            usdc_to_credit: usdcAmountToCredit,
+            coinedge_btc_address: treasuryAddresses.btc,
             status: 'AWAITING_USER_TRANSFER',
           },
         });
 
         return new Response(JSON.stringify({
           success: true,
-          orderId,
-          status: 'PENDING',
-          message: 'BTC sale initiated. Please sign the transaction in your wallet to send BTC to CoinEdge.',
-          coinedgeBtcAddress: 'bc1q_coinedge_receiving_address', // TODO: Get from config
+          orderId: order.order_id,
+          status: 'AWAITING_TRANSFER',
+          message: 'BTC sale initiated. Send BTC to the address below to complete the transaction.',
+          coinedgeBtcAddress: treasuryAddresses.btc,
+          btcAmount: btcAmountToReceive,
+          usdcAmount: usdcAmountToCredit,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -227,7 +341,7 @@ serve(async (req) => {
       }
 
       case 'CASHOUT': {
-        // User sends USDC to CoinEdge, CoinEdge initiates bank payout
+        // User sends USDC to CoinEdge, CoinEdge initiates bank payout via Plaid
         if (!bankAccountId) {
           return new Response(JSON.stringify({ error: 'Bank account selection required' }), {
             status: 400,
@@ -235,16 +349,38 @@ serve(async (req) => {
           });
         }
 
+        // Check if treasury USDC address is configured
+        if (!treasuryAddresses.usdc) {
+          return new Response(JSON.stringify({ 
+            error: 'CoinEdge USDC receiving address not configured. Please contact support.' 
+          }), {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const sourceAmount = usdcAmount || 0;
+        const fee = feeUsdc || 0;
+        const usdToSend = sourceAmount - fee;
+
         // Create cashout order
-        await supabase.from('cashout_orders').insert({
+        const { data: cashoutOrder, error: cashoutError } = await supabase.from('cashout_orders').insert({
           user_id: userId,
           bank_account_id: bankAccountId,
           source_asset: 'USDC',
-          source_amount: 0, // TODO: Get from quote
-          usd_amount: 0, // TODO: Get from quote
-          fee_usd: 0,
+          source_amount: sourceAmount,
+          usd_amount: usdToSend,
+          fee_usd: fee,
           status: 'pending',
-        });
+        }).select().single();
+
+        if (cashoutError) {
+          console.error('Failed to create cashout order:', cashoutError);
+          return new Response(JSON.stringify({ error: 'Failed to create cashout order' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
 
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_CASHOUT',
@@ -254,16 +390,23 @@ serve(async (req) => {
           metadata: {
             bank_account_id: bankAccountId,
             user_signed: true,
+            source_amount: sourceAmount,
+            usd_to_bank: usdToSend,
+            fee: fee,
+            coinedge_usdc_address: treasuryAddresses.usdc,
             status: 'AWAITING_USDC_TRANSFER',
           },
         });
 
         return new Response(JSON.stringify({
           success: true,
-          orderId,
-          status: 'PENDING',
-          message: 'Cash out initiated. Please sign the transaction to send USDC to CoinEdge.',
-          coinedgeUsdcAddress: '0x_coinedge_usdc_receiving_address', // TODO: Get from config
+          orderId: cashoutOrder.order_id,
+          status: 'AWAITING_TRANSFER',
+          message: 'Cash out initiated. Send USDC to the address below to complete.',
+          coinedgeUsdcAddress: treasuryAddresses.usdc,
+          usdcAmount: sourceAmount,
+          usdAmount: usdToSend,
+          fee: fee,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
