@@ -18,6 +18,14 @@ const OrderRow: React.FC<{ order: SwapOrder }> = ({ order }) => {
   const isBuy = order.order_type === "BUY_BTC";
   const status = statusConfig[order.status];
 
+  // Format tx_hash for display (show first 8 and last 6 chars)
+  const formatTxHash = (hash: string | null) => {
+    if (!hash) return null;
+    if (hash.startsWith('p2p_')) return 'Party-to-Party';
+    if (hash.length > 20) return `${hash.slice(0, 8)}...${hash.slice(-6)}`;
+    return hash;
+  };
+
   return (
     <div className="flex items-center justify-between py-3 border-b last:border-b-0">
       <div className="flex items-center gap-3">
@@ -35,6 +43,12 @@ const OrderRow: React.FC<{ order: SwapOrder }> = ({ order }) => {
           <p className="text-xs text-muted-foreground">
             {format(new Date(order.created_at), "MMM d, yyyy 'at' h:mm a")}
           </p>
+          {order.tx_hash && order.status === "COMPLETED" && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+              <ExternalLink className="h-3 w-3" />
+              {formatTxHash(order.tx_hash)}
+            </p>
+          )}
         </div>
       </div>
       <div className="text-right">
