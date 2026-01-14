@@ -1,10 +1,11 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Send, Download, Gift, Bitcoin, DollarSign, Copy, TrendingUp, TrendingDown, Minus, Building2, Shield, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
@@ -17,6 +18,9 @@ import { CashOutModal } from "@/components/wallet/CashOutModal";
 import { CashOutHistory } from "@/components/wallet/CashOutHistory";
 import { ReceiveModal } from "@/components/wallet/ReceiveModal";
 import { Badge } from "@/components/ui/badge";
+import { Database } from "@/integrations/supabase/types";
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 // Mock account performance data with more realistic values for demo
 const accountPerformanceData = [
@@ -48,7 +52,7 @@ const calculatePerformance = (data: typeof accountPerformanceData) => {
 const currentBtcPrice = 93327.91;
 
 const Wallet: React.FC = () => {
-  const { profile, isKycApproved } = useAuth();
+  const { profile: supabaseProfile, isKycApproved: supabaseKycApproved } = useAuth();
   const { 
     isConnected, 
     btcWallet, 
@@ -57,7 +61,9 @@ const Wallet: React.FC = () => {
     usdcBalance, 
     refreshBalances,
     isLoading: walletLoading,
-    isWalletInitializing 
+    isWalletInitializing,
+    syncedProfile,
+    isAuthenticated: isDynamicAuthenticated
   } = useDynamicWallet();
   
   const navigate = useNavigate();
@@ -66,6 +72,28 @@ const Wallet: React.FC = () => {
   const [usdcActionsModalOpen, setUsdcActionsModalOpen] = useState(false);
   const [cashOutModalOpen, setCashOutModalOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
+  
+  // For Dynamic users, fetch profile separately
+  const [dynamicProfile, setDynamicProfile] = useState<Profile | null>(null);
+  
+  useEffect(() => {
+    const fetchDynamicProfile = async () => {
+      if (isDynamicAuthenticated && syncedProfile?.userId && !supabaseProfile) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', syncedProfile.userId)
+          .maybeSingle();
+        setDynamicProfile(data);
+      }
+    };
+    fetchDynamicProfile();
+  }, [isDynamicAuthenticated, syncedProfile?.userId, supabaseProfile]);
+  
+  // Use whichever profile is available
+  const profile = supabaseProfile || dynamicProfile;
+  const isKycApproved = supabaseKycApproved || dynamicProfile?.kyc_status === 'approved';
+  
 
   const handleRefresh = useCallback(async () => {
     await refreshBalances();
@@ -298,7 +326,12 @@ const Wallet: React.FC = () => {
                   )}
                 </>
               ) : (
-                <p className="text-muted-foreground">Complete KYC to view your BTC wallet</p>
+                <div className="space-y-3">
+                  <p className="text-muted-foreground">Complete KYC to view your BTC wallet</p>
+                  <Button onClick={() => navigate('/kyc')} size="sm" className="w-full">
+                    Start KYC Verification
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -347,7 +380,12 @@ const Wallet: React.FC = () => {
                   )}
                 </>
               ) : (
-                <p className="text-muted-foreground">Complete KYC to view your USDC wallet</p>
+                <div className="space-y-3">
+                  <p className="text-muted-foreground">Complete KYC to view your USDC wallet</p>
+                  <Button onClick={() => navigate('/kyc')} size="sm" className="w-full">
+                    Start KYC Verification
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
