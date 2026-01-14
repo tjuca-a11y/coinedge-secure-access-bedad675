@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,8 @@ import {
   ExternalLink,
   RefreshCw,
   Send,
+  Banknote,
+  CircleDollarSign,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,10 +69,13 @@ interface SwapOrder {
   btc_price_at_order: number;
   fee_usdc: number;
   destination_address: string | null;
+  source_usdc_address: string | null;
   tx_hash: string | null;
   created_at: string;
   completed_at: string | null;
   failed_reason: string | null;
+  usdc_payout_tx_hash?: string | null;
+  usdc_payout_at?: string | null;
 }
 
 const AdminSwapOrders: React.FC = () => {
@@ -81,6 +87,9 @@ const AdminSwapOrders: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<SwapOrder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [txHashInput, setTxHashInput] = useState('');
+  const [usdcTxHashInput, setUsdcTxHashInput] = useState('');
+  const [customerUsdcAddress, setCustomerUsdcAddress] = useState<string | null>(null);
+  const [pendingPayoutsFilter, setPendingPayoutsFilter] = useState(false);
 
   const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-swap-orders'],
@@ -124,6 +133,16 @@ const AdminSwapOrders: React.FC = () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient, toast]);
+
+  // Fetch customer USDC address when selecting a SELL_BTC order
+  useEffect(() => {
+    if (selectedOrder?.order_type === 'SELL_BTC' && selectedOrder.customer_id) {
+      fetchCustomerUsdcAddress(selectedOrder.customer_id);
+    } else {
+      setCustomerUsdcAddress(null);
+    }
+    setUsdcTxHashInput('');
+  }, [selectedOrder?.id]);
 
   const handleProcessOrder = async (orderId: string, newStatus: 'PENDING' | 'PROCESSING' | 'CANCELLED') => {
     setIsProcessing(true);
@@ -267,6 +286,89 @@ const AdminSwapOrders: React.FC = () => {
     }
   };
 
+  // Fetch customer's USDC address when selecting a SELL_BTC order
+  const fetchCustomerUsdcAddress = async (customerId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('usdc_address')
+        .eq('id', customerId)
+        .single();
+      
+      if (error) throw error;
+      setCustomerUsdcAddress(data?.usdc_address || null);
+    } catch (error) {
+      console.error('Error fetching customer USDC address:', error);
+      setCustomerUsdcAddress(null);
+    }
+  };
+
+  // Handle USDC payout for SELL_BTC orders
+  const handleUsdcPayout = async (orderId: string) => {
+    if (!usdcTxHashInput.trim()) {
+      toast({
+        title: 'USDC Transaction Hash Required',
+        description: 'Please enter the USDC transaction hash from Etherscan',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Update order with USDC payout info
+      const { error: updateError } = await supabase
+        .from('customer_swap_orders')
+        .update({ 
+          status: 'COMPLETED',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+
+      if (updateError) throw updateError;
+
+      // Log audit event
+      await supabase.from('audit_logs').insert({
+        action: 'USDC_PAYOUT_SENT',
+        actor_type: 'admin',
+        event_id: selectedOrder?.order_id || orderId,
+        metadata: {
+          order_id: selectedOrder?.order_id,
+          usdc_amount: selectedOrder?.usdc_amount,
+          usdc_tx_hash: usdcTxHashInput.trim(),
+          customer_id: selectedOrder?.customer_id,
+          customer_usdc_address: customerUsdcAddress,
+        },
+      });
+
+      toast({ 
+        title: 'USDC Payout Recorded', 
+        description: `Payout of $${selectedOrder?.usdc_amount?.toFixed(2)} USDC recorded successfully` 
+      });
+      refetch();
+      setSelectedOrder(null);
+      setUsdcTxHashInput('');
+      setCustomerUsdcAddress(null);
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to record USDC payout',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Get orders pending USDC payout (SELL_BTC with status COMPLETED and tx_hash present but no usdc_payout)
+  const ordersPendingUsdcPayout = orders.filter(
+    (o) => o.order_type === 'SELL_BTC' && 
+           o.status === 'COMPLETED' && 
+           o.tx_hash && 
+           !o.usdc_payout_tx_hash
+  );
+
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -276,6 +378,13 @@ const AdminSwapOrders: React.FC = () => {
 
     const matchesType = typeFilter === 'all' || order.order_type === typeFilter;
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+
+    // Additional filter for pending payouts
+    if (pendingPayoutsFilter) {
+      return order.order_type === 'SELL_BTC' && 
+             order.status === 'COMPLETED' && 
+             order.tx_hash;
+    }
 
     return matchesSearch && matchesType && matchesStatus;
   });
@@ -432,7 +541,7 @@ const AdminSwapOrders: React.FC = () => {
       </div>
 
       {/* Status Summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="bg-yellow-500/10 border-yellow-500/20">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
@@ -460,6 +569,28 @@ const AdminSwapOrders: React.FC = () => {
               <p className="text-2xl font-bold text-foreground">{stats.failedOrders}</p>
             </div>
             <XCircle className="h-8 w-8 text-red-400/50" />
+          </CardContent>
+        </Card>
+
+        {/* Pending USDC Payouts Card */}
+        <Card 
+          className={cn(
+            "border-2 cursor-pointer transition-all",
+            pendingPayoutsFilter 
+              ? "bg-primary/20 border-primary" 
+              : "bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
+          )}
+          onClick={() => setPendingPayoutsFilter(!pendingPayoutsFilter)}
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-blue-400 text-sm">Pending USDC Payouts</p>
+              <p className="text-2xl font-bold text-foreground">{ordersPendingUsdcPayout.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {formatUsdc(ordersPendingUsdcPayout.reduce((sum, o) => sum + o.usdc_amount, 0))} total
+              </p>
+            </div>
+            <CircleDollarSign className="h-8 w-8 text-blue-400/50" />
           </CardContent>
         </Card>
       </div>
@@ -645,11 +776,30 @@ const AdminSwapOrders: React.FC = () => {
 
               {selectedOrder.destination_address && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Destination Address</p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedOrder.order_type === 'BUY_BTC' ? 'BTC Destination Address' : 'Destination Address'}
+                  </p>
                   <div className="flex items-center gap-2">
                     <p className="font-mono text-sm truncate">{selectedOrder.destination_address}</p>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(selectedOrder.destination_address!)}>
                       <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {selectedOrder.source_usdc_address && selectedOrder.order_type === 'SELL_BTC' && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer's BTC Source Address</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-sm truncate">{selectedOrder.source_usdc_address}</p>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(selectedOrder.source_usdc_address!)}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                      <a href={`https://mempool.space/address/${selectedOrder.source_usdc_address}`} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                     </Button>
                   </div>
                 </div>
@@ -796,6 +946,70 @@ const AdminSwapOrders: React.FC = () => {
                       Mark as Completed
                     </Button>
                   )}
+                </div>
+              )}
+
+              {/* USDC Payout Section for SELL_BTC orders */}
+              {selectedOrder.order_type === 'SELL_BTC' && selectedOrder.status === 'COMPLETED' && selectedOrder.tx_hash && (
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CircleDollarSign className="h-5 w-5 text-blue-400" />
+                    <p className="text-sm font-medium text-blue-400">USDC Payout Required</p>
+                  </div>
+                  
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Amount to Send:</span>
+                      <span className="font-semibold text-foreground">{formatUsdc(selectedOrder.usdc_amount)} USDC</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">BTC Received:</span>
+                      <span className="font-mono text-foreground">{formatBtc(selectedOrder.btc_amount)} BTC</span>
+                    </div>
+                    {customerUsdcAddress ? (
+                      <div className="pt-2 border-t border-blue-500/20">
+                        <p className="text-xs text-muted-foreground mb-1">Customer USDC Address (Ethereum):</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono text-xs bg-background/50 p-2 rounded flex-1 truncate">
+                            {customerUsdcAddress}
+                          </p>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(customerUsdcAddress)}>
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                            <a href={`https://etherscan.io/address/${customerUsdcAddress}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="pt-2 border-t border-blue-500/20">
+                        <p className="text-xs text-yellow-400">⚠️ Customer USDC address not found in profile</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="usdc-tx-hash" className="text-sm">USDC Transaction Hash (Etherscan)</Label>
+                    <Input
+                      id="usdc-tx-hash"
+                      placeholder="Enter USDC transaction hash from Etherscan..."
+                      value={usdcTxHashInput}
+                      onChange={(e) => setUsdcTxHashInput(e.target.value)}
+                      className="font-mono text-sm"
+                    />
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      onClick={() => handleUsdcPayout(selectedOrder.id)}
+                      disabled={isProcessing || !usdcTxHashInput.trim()}
+                    >
+                      <Banknote className="h-4 w-4 mr-2" />
+                      {isProcessing ? 'Processing...' : 'Record USDC Payout'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
