@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,12 +9,27 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { User, Shield, Bell, Key, LogOut, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile, signOut, kycStatus } = useAuth();
+  const { isAuthenticated: isDynamicAuthenticated, disconnectWallet } = useDynamicWallet();
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      if (isDynamicAuthenticated) {
+        await disconnectWallet();
+      } else {
+        await signOut();
+      }
+    } catch (e) {
+      console.error("[Settings] sign out failed", e);
+      toast.error("Sign out failed");
+    }
+  }, [disconnectWallet, isDynamicAuthenticated, signOut]);
 
   const getKycBadge = () => {
     if (kycStatus === "approved") {
@@ -63,7 +78,7 @@ const Settings: React.FC = () => {
         </Card>
 
         {/* Identity Verification */}
-        <Card 
+        <Card
           className="cursor-pointer hover:bg-accent/50 transition-colors"
           onClick={() => navigate("/settings/identity-verification")}
         >
@@ -140,10 +155,18 @@ const Settings: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full justify-start" onClick={() => toast.info("Password reset email sent")}>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => toast.info("Password reset email sent")}
+            >
               Change Password
             </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => toast.info("2FA setup coming soon")}>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => toast.info("2FA setup coming soon")}
+            >
               Enable Two-Factor Authentication
             </Button>
           </CardContent>
@@ -152,7 +175,7 @@ const Settings: React.FC = () => {
         {/* Sign Out */}
         <Card className="border-destructive/20">
           <CardContent className="pt-6">
-            <Button variant="destructive" className="w-full gap-2" onClick={signOut}>
+            <Button variant="destructive" className="w-full gap-2" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
               Sign Out
             </Button>
@@ -164,3 +187,4 @@ const Settings: React.FC = () => {
 };
 
 export default Settings;
+
