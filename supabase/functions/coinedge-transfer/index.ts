@@ -135,11 +135,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
-    // Client for auth validation
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: req.headers.get('Authorization')! } }
-    });
-    
     // Service client for DB operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -153,23 +148,56 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    let userId: string | null = null;
+    let userEmail: string | null = null;
+    
+    // Try Supabase auth first
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
     const { data: claims, error: claimsError } = await supabaseAuth.auth.getClaims(token);
     
-    if (claimsError || !claims?.claims?.sub) {
+    if (!claimsError && claims?.claims?.sub) {
+      userId = claims.claims.sub;
+    } else {
+      // Try Dynamic token - decode JWT to get email
+      try {
+        const payloadBase64 = token.split('.')[1];
+        const payload = JSON.parse(atob(payloadBase64));
+        userEmail = payload.email || payload.verified_credentials?.[0]?.email;
+        console.log('Dynamic token detected, email:', userEmail);
+      } catch (decodeError) {
+        console.error('Failed to decode token:', decodeError);
+      }
+    }
+
+    if (!userId && !userEmail) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claims.claims.sub;
-
-    // Check KYC status
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('kyc_status, btc_address, usdc_address')
-      .eq('user_id', userId)
-      .single();
+    // Get profile - by user_id for Supabase users, by email for Dynamic users
+    let profile: { kyc_status: string; btc_address: string | null; usdc_address: string | null; user_id: string } | null = null;
+    
+    if (userId) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('kyc_status, btc_address, usdc_address, user_id')
+        .eq('user_id', userId)
+        .single();
+      profile = data;
+    } else if (userEmail) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('kyc_status, btc_address, usdc_address, user_id')
+        .eq('email', userEmail)
+        .single();
+      profile = data;
+      if (data) userId = data.user_id;
+    }
 
     if (!profile || profile.kyc_status !== 'approved') {
       return new Response(JSON.stringify({ error: 'KYC approval required' }), {
@@ -177,6 +205,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Ensure userId is set (from profile if found via email)
+    const customerId = userId || profile.user_id;
 
     const body: TransferRequest = await req.json();
     const { quoteId, type, signature, userBtcAddress, userEthAddress, bankAccountId, voucherCode, usdcAmount, btcAmount, btcPrice, feeUsdc } = body;
@@ -220,7 +251,7 @@ serve(async (req) => {
 
         // Create order record
         const { data: order, error: orderError } = await supabase.from('customer_swap_orders').insert({
-          customer_id: userId,
+          customer_id: customerId,
           order_type: 'BUY_BTC',
           usdc_amount: usdcAmountCharged,
           btc_amount: btcAmountToSend,
@@ -244,7 +275,7 @@ serve(async (req) => {
           destinationAddress,
           btcAmountToSend,
           usdcAmountCharged,
-          userId,
+          customerId,
           order.id
         );
         
@@ -258,7 +289,7 @@ serve(async (req) => {
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_BUY_BTC',
           actor_type: 'system',
-          actor_id: userId,
+          actor_id: customerId,
           event_id: orderId,
           metadata: {
             quote_id: quoteId,
@@ -302,7 +333,7 @@ serve(async (req) => {
         }
 
         const { data: order, error: orderError } = await supabase.from('customer_swap_orders').insert({
-          customer_id: userId,
+          customer_id: customerId,
           order_type: 'SELL_BTC',
           usdc_amount: usdcAmountToCredit,
           btc_amount: btcAmountToReceive,
@@ -323,7 +354,7 @@ serve(async (req) => {
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_SELL_BTC',
           actor_type: 'system',
-          actor_id: userId,
+          actor_id: customerId,
           event_id: orderId,
           metadata: {
             quote_id: quoteId,
@@ -369,7 +400,7 @@ serve(async (req) => {
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_REDEEM',
           actor_type: 'system',
-          actor_id: userId,
+          actor_id: customerId,
           event_id: orderId,
           metadata: {
             voucher_code: voucherCode,
@@ -410,7 +441,7 @@ serve(async (req) => {
         const usdToSend = sourceAmount - fee;
 
         const { data: cashoutOrder, error: cashoutError } = await supabase.from('cashout_orders').insert({
-          user_id: userId,
+          user_id: customerId,
           bank_account_id: bankAccountId,
           source_asset: 'USDC',
           source_amount: sourceAmount,
@@ -430,7 +461,7 @@ serve(async (req) => {
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_CASHOUT',
           actor_type: 'system',
-          actor_id: userId,
+          actor_id: customerId,
           event_id: orderId,
           metadata: {
             bank_account_id: bankAccountId,

@@ -143,11 +143,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: req.headers.get('Authorization')! } }
-    });
-
     // Verify user JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -158,23 +155,57 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    let userId: string | null = null;
+    let userEmail: string | null = null;
+    
+    // Try Supabase auth first
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
     const { data: claims, error: claimsError } = await supabase.auth.getClaims(token);
     
-    if (claimsError || !claims?.claims?.sub) {
+    if (!claimsError && claims?.claims?.sub) {
+      userId = claims.claims.sub;
+    } else {
+      // Try Dynamic token - decode JWT to get email
+      try {
+        const payloadBase64 = token.split('.')[1];
+        const payload = JSON.parse(atob(payloadBase64));
+        userEmail = payload.email || payload.verified_credentials?.[0]?.email;
+        console.log('Dynamic token detected, email:', userEmail);
+      } catch (decodeError) {
+        console.error('Failed to decode token:', decodeError);
+      }
+    }
+
+    if (!userId && !userEmail) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claims.claims.sub;
-
-    // Check KYC status
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('kyc_status')
-      .eq('user_id', userId)
-      .single();
+    // Get profile - by user_id for Supabase users, by email for Dynamic users
+    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    let profile: { kyc_status: string; user_id: string } | null = null;
+    
+    if (userId) {
+      const { data } = await adminSupabase
+        .from('profiles')
+        .select('kyc_status, user_id')
+        .eq('user_id', userId)
+        .single();
+      profile = data;
+    } else if (userEmail) {
+      const { data } = await adminSupabase
+        .from('profiles')
+        .select('kyc_status, user_id')
+        .eq('email', userEmail)
+        .single();
+      profile = data;
+      if (data) userId = data.user_id;
+    }
 
     if (!profile || profile.kyc_status !== 'approved') {
       return new Response(JSON.stringify({ error: 'KYC approval required' }), {
@@ -260,12 +291,12 @@ serve(async (req) => {
     const quoteId = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-    // Log quote for audit
-    const supabaseService = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    await supabaseService.from('audit_logs').insert({
+    // Log quote for audit - use adminSupabase (already created) and profile.user_id
+    const customerId = userId || profile.user_id;
+    await adminSupabase.from('audit_logs').insert({
       action: 'QUOTE_GENERATED',
       actor_type: 'system',
-      actor_id: userId,
+      actor_id: customerId,
       event_id: quoteId,
       metadata: {
         type,
@@ -280,7 +311,7 @@ serve(async (req) => {
     console.log('Quote generated:', { quoteId, type, btcPrice, inputAmount, outputAmount, expiresAt });
 
     // Get treasury addresses from system_settings
-    const { data: settings } = await supabaseService
+    const { data: settings } = await adminSupabase
       .from('system_settings')
       .select('setting_key, setting_value')
       .in('setting_key', ['coinedge_btc_address', 'coinedge_usdc_address']);
