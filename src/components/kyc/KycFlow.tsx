@@ -237,23 +237,45 @@ export const KycFlow: React.FC = () => {
 
   const { open: openPlaidIdentity, ready: plaidIdentityReady } = usePlaidLinkSDK(plaidIdentityConfig);
 
-  // Auto-open Plaid Identity when token is ready
-  useEffect(() => {
-    if (plaidLinkToken && plaidIdentityReady && step === 'identity' && !verificationStarted) {
-      setVerificationStarted(true);
-      setIsPlaidIdentityOpen(true);
-      openPlaidIdentity();
-    }
-  }, [plaidLinkToken, plaidIdentityReady, step, verificationStarted, openPlaidIdentity]);
+  // NOTE: Do not auto-open Plaid from an effect.
+  // Many browsers require Plaid Link to be opened from a user gesture (button click).
+  // We instead show an "Open verification" button once the token is ready.
 
   const handleStartVerification = async () => {
     console.log('[KYC Flow] Start Identity Verification clicked');
     const tokenCreated = await createIdentityVerificationToken();
     console.log('[KYC Flow] tokenCreated:', tokenCreated);
+
+    if (tokenCreated) {
+      toast.info('Token created. Tap "Open verification" to continue.');
+      return;
+    }
+
     if (!tokenCreated && error) {
       toast.info('Plaid not configured. Using demo mode.');
     }
   };
+
+  const handleOpenPlaidIdentity = useCallback(() => {
+    console.log('[KYC Flow] Open Plaid Identity clicked', {
+      hasToken: !!plaidLinkToken,
+      ready: plaidIdentityReady,
+    });
+
+    if (!plaidLinkToken) {
+      toast.error('Missing verification token. Please start verification again.');
+      return;
+    }
+
+    if (!plaidIdentityReady) {
+      toast.info('Preparing verification… please try again in a moment.');
+      return;
+    }
+
+    setVerificationStarted(true);
+    setIsPlaidIdentityOpen(true);
+    openPlaidIdentity();
+  }, [openPlaidIdentity, plaidIdentityReady, plaidLinkToken]);
 
   // Handle demo mode identity submission
   const handleDemoIdentitySubmit = async () => {
@@ -485,24 +507,60 @@ export const KycFlow: React.FC = () => {
         </div>
       </div>
 
-      {plaidLinkToken && plaidIdentityReady ? (
-        <div className="text-center space-y-4">
-          <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Opening verification window...
-          </p>
-        </div>
-      ) : (
+      {plaidLinkToken ? (
         <div className="space-y-4">
+          <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+            {plaidIdentityReady
+              ? 'Ready to open the verification window.'
+              : 'Preparing verification window…'}
+          </div>
+
+          <Button
+            onClick={handleOpenPlaidIdentity}
+            className="w-full"
+            disabled={loading || !plaidIdentityReady}
+          >
+            {plaidIdentityReady ? 'Open Verification' : (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Preparing…
+              </>
+            )}
+          </Button>
+
           <Button
             onClick={handleStartVerification}
+            variant="outline"
             className="w-full"
             disabled={loading}
           >
+            Restart Verification
+          </Button>
+
+          {/* Demo mode fallback - only show in development */}
+          {import.meta.env.DEV && (
+            <div className="pt-4 border-t">
+              <p className="text-xs text-muted-foreground text-center mb-2">
+                Development mode only:
+              </p>
+              <Button
+                onClick={handleDemoIdentitySubmit}
+                variant="outline"
+                className="w-full"
+                disabled={loading}
+              >
+                Simulate Verification
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Button onClick={handleStartVerification} className="w-full" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Starting...
+                Starting…
               </>
             ) : (
               'Start Identity Verification'
