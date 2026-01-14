@@ -2,19 +2,24 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlaidLink as usePlaidLinkSDK, PlaidLinkOnSuccess, PlaidLinkOptions } from 'react-plaid-link';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDynamicWallet } from '@/contexts/DynamicWalletContext';
 import { useKyc, KycFormData } from '@/hooks/useKyc';
 import { usePlaidLink } from '@/hooks/usePlaidLink';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle2, Clock, XCircle, Shield, User, CreditCard, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
 
+type Profile = Database['public']['Tables']['profiles']['Row'];
 type KycStep = 'personal' | 'identity' | 'bank' | 'status';
 
 export const KycFlow: React.FC = () => {
-  const { profile, isKycApproved, kycStatus, signOut } = useAuth();
+  const { profile: supabaseProfile, isKycApproved: supabaseKycApproved, kycStatus: supabaseKycStatus, refreshProfile } = useAuth();
+  const { syncedProfile, isAuthenticated: isDynamicAuthenticated } = useDynamicWallet();
   const {
     loading,
     error,
@@ -31,24 +36,76 @@ export const KycFlow: React.FC = () => {
   const { openPlaidLink: openBankLink, isLoading: isBankLinkLoading } = usePlaidLink();
   const navigate = useNavigate();
 
-  const [step, setStep] = useState<KycStep>(() => {
-    if (kycStatus === 'approved') return 'status';
-    if (kycStatus === 'pending') return 'status';
-    if (kycStatus === 'rejected') return 'status';
-    return 'personal';
-  });
+  // For Dynamic users, fetch profile separately
+  const [dynamicProfile, setDynamicProfile] = useState<Profile | null>(null);
+  const [dynamicProfileLoading, setDynamicProfileLoading] = useState(false);
+
+  // Fetch Dynamic user's profile from Supabase
+  const refreshDynamicProfile = useCallback(async () => {
+    if (isDynamicAuthenticated && syncedProfile?.userId) {
+      setDynamicProfileLoading(true);
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', syncedProfile.userId)
+          .maybeSingle();
+        setDynamicProfile(data);
+      } finally {
+        setDynamicProfileLoading(false);
+      }
+    }
+  }, [isDynamicAuthenticated, syncedProfile?.userId]);
+
+  useEffect(() => {
+    if (isDynamicAuthenticated && syncedProfile?.userId && !supabaseProfile) {
+      refreshDynamicProfile();
+    }
+  }, [isDynamicAuthenticated, syncedProfile?.userId, supabaseProfile, refreshDynamicProfile]);
+
+  // Use whichever profile is available
+  const profile = supabaseProfile || dynamicProfile;
+  const kycStatus = supabaseKycStatus || dynamicProfile?.kyc_status || null;
+  const isKycApproved = supabaseKycApproved || dynamicProfile?.kyc_status === 'approved';
+
+  const [step, setStep] = useState<KycStep>('personal');
+  
+  // Initialize step based on KYC status
+  useEffect(() => {
+    if (kycStatus === 'approved') setStep('status');
+    else if (kycStatus === 'pending') setStep('status');
+    else if (kycStatus === 'rejected') setStep('status');
+    else setStep('personal');
+  }, [kycStatus]);
 
   const [formData, setFormData] = useState<KycFormData>({
-    full_name: profile?.full_name || '',
-    date_of_birth: profile?.date_of_birth || '',
-    address_line1: profile?.address_line1 || '',
-    address_line2: profile?.address_line2 || '',
-    city: profile?.city || '',
-    state: profile?.state || '',
-    postal_code: profile?.postal_code || '',
-    country: profile?.country || 'US',
-    phone: profile?.phone || '',
+    full_name: '',
+    date_of_birth: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'US',
+    phone: '',
   });
+
+  // Update form data when profile changes
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        full_name: profile.full_name || '',
+        date_of_birth: profile.date_of_birth || '',
+        address_line1: profile.address_line1 || '',
+        address_line2: profile.address_line2 || '',
+        city: profile.city || '',
+        state: profile.state || '',
+        postal_code: profile.postal_code || '',
+        country: profile.country || 'US',
+        phone: profile.phone || '',
+      });
+    }
+  }, [profile]);
 
   const [isPlaidIdentityOpen, setIsPlaidIdentityOpen] = useState(false);
   const [verificationStarted, setVerificationStarted] = useState(false);
@@ -99,6 +156,8 @@ export const KycFlow: React.FC = () => {
     e.preventDefault();
     const success = await submitPersonalInfo(formData);
     if (success) {
+      // Refresh profile for Dynamic users
+      await refreshDynamicProfile();
       // Start Plaid Identity verification
       const tokenCreated = await createIdentityVerificationToken();
       if (tokenCreated) {
@@ -122,6 +181,7 @@ export const KycFlow: React.FC = () => {
 
     const success = await initiateRetry();
     if (success) {
+      await refreshDynamicProfile();
       setVerificationStarted(false);
       setStep('personal');
       toast.success('You can now start a new verification attempt');
@@ -141,6 +201,9 @@ export const KycFlow: React.FC = () => {
     if (verificationId) {
       const result = await handleVerificationComplete(verificationId);
       
+      // Refresh profile after verification
+      await refreshDynamicProfile();
+      
       if (result.success) {
         if (result.status === 'approved') {
           toast.success('Identity verified! Now link your bank account.');
@@ -156,7 +219,7 @@ export const KycFlow: React.FC = () => {
     }
     
     clearPlaidTokens();
-  }, [identityVerificationId, handleVerificationComplete, clearPlaidTokens]);
+  }, [identityVerificationId, handleVerificationComplete, clearPlaidTokens, refreshDynamicProfile]);
 
   // Plaid Identity SDK config
   const plaidIdentityConfig: PlaidLinkOptions = {
@@ -195,6 +258,7 @@ export const KycFlow: React.FC = () => {
     toast.info('Demo mode: Simulating identity verification...');
     // Simulate verification delay
     await new Promise(resolve => setTimeout(resolve, 1500));
+    await refreshDynamicProfile();
     toast.success('Demo: Identity verified! Now link your bank account.');
     setStep('bank');
   };
@@ -220,6 +284,7 @@ export const KycFlow: React.FC = () => {
   const handleSimulateApproval = async () => {
     const success = await simulateKycApproval();
     if (success) {
+      await refreshDynamicProfile();
       toast.success('KYC approved! Your wallet is ready.');
       navigate('/');
     } else if (error) {
