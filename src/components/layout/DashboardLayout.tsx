@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { BottomNav } from "./BottomNav";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
@@ -16,6 +17,16 @@ export interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, title, subtitle, hideHeader }: DashboardLayoutProps) {
   const { user, signOut } = useAuth();
+  const { isAuthenticated: isDynamicAuthenticated, disconnectWallet } = useDynamicWallet();
+
+  // Handle sign out for both Supabase and Dynamic auth
+  const handleSignOut = useCallback(async () => {
+    if (isDynamicAuthenticated) {
+      await disconnectWallet();
+    } else {
+      await signOut();
+    }
+  }, [isDynamicAuthenticated, disconnectWallet, signOut]);
 
   return (
     <SidebarProvider>
@@ -35,7 +46,7 @@ export function DashboardLayout({ children, title, subtitle, hideHeader }: Dashb
               </div>
               <div className="flex items-center gap-2 md:gap-4 shrink-0">
                 <span className="text-xs md:text-sm text-muted-foreground hidden md:block truncate max-w-[150px]">{user?.email}</span>
-                <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 md:h-10 md:w-10">
+                <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-8 w-8 md:h-10 md:w-10">
                   <LogOut className="h-4 w-4 md:h-5 md:w-5" />
                 </Button>
               </div>
