@@ -98,7 +98,7 @@ const Settings: React.FC = () => {
       icon: <User className="h-5 w-5 text-primary" />,
       title: "Profile & Personal Info",
       description: "Manage your personal information and account details",
-      onClick: () => toast.info("Profile settings coming soon"),
+      onClick: () => navigate("/settings/profile"),
     },
     {
       icon: <Fingerprint className="h-5 w-5 text-primary" />,
@@ -111,13 +111,13 @@ const Settings: React.FC = () => {
       icon: <Lock className="h-5 w-5 text-primary" />,
       title: "Security & Login",
       description: "Protect your account with 2FA and security settings",
-      onClick: () => toast.info("Security settings coming soon"),
+      onClick: () => navigate("/settings/security"),
     },
     {
       icon: <CreditCard className="h-5 w-5 text-primary" />,
       title: "Payment Methods",
       description: "Manage your funding sources and withdrawal destinations",
-      onClick: () => toast.info("Payment methods coming soon"),
+      onClick: () => navigate("/settings/payment-methods"),
     },
     {
       icon: <Wallet className="h-5 w-5 text-primary" />,
