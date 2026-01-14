@@ -12,12 +12,135 @@ interface QuoteRequest {
   asset: 'BTC' | 'USDC';
 }
 
+// ============ Rate Limiting ============
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 30; // 30 requests per minute
+
+function checkRateLimit(clientId: string): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(clientId);
+
+  // Cleanup old entries if store gets too large
+  if (rateLimitStore.size > 1000) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (now >= v.resetAt) rateLimitStore.delete(k);
+    }
+  }
+
+  if (!entry || now >= entry.resetAt) {
+    rateLimitStore.set(clientId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetAt: now + RATE_LIMIT_WINDOW_MS };
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+  }
+
+  entry.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - entry.count, resetAt: entry.resetAt };
+}
+
+function getClientId(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+    || req.headers.get('x-real-ip') 
+    || 'unknown';
+}
+
+// ============ Price Oracle (Real-time) ============
+interface PriceCache {
+  btcUsd: number;
+  updatedAt: number;
+}
+
+let priceCache: PriceCache | null = null;
+const CACHE_TTL_MS = 15000; // 15 seconds
+
+const PRICE_SOURCES = [
+  {
+    name: 'CoinGecko',
+    url: 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
+    parser: (data: any) => data?.bitcoin?.usd,
+  },
+  {
+    name: 'Coinbase',
+    url: 'https://api.coinbase.com/v2/prices/BTC-USD/spot',
+    parser: (data: any) => parseFloat(data?.data?.amount),
+  },
+];
+
+async function fetchBtcPrice(): Promise<number> {
+  const now = Date.now();
+
+  // Return cached price if still valid
+  if (priceCache && now - priceCache.updatedAt < CACHE_TTL_MS) {
+    console.log('Using cached BTC price:', priceCache.btcUsd);
+    return priceCache.btcUsd;
+  }
+
+  // Try each price source
+  for (const source of PRICE_SOURCES) {
+    try {
+      const response = await fetch(source.url, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const price = source.parser(data);
+
+      if (typeof price === 'number' && !isNaN(price) && price > 1000 && price < 1000000) {
+        priceCache = { btcUsd: price, updatedAt: now };
+        console.log(`Fresh BTC price from ${source.name}: $${price.toLocaleString()}`);
+        return price;
+      }
+    } catch (error) {
+      console.error(`Failed to fetch from ${source.name}:`, error);
+    }
+  }
+
+  // Fallback to stale cache
+  if (priceCache) {
+    console.warn('Using stale cache - all sources failed');
+    return priceCache.btcUsd;
+  }
+
+  throw new Error('All price sources failed and no cache available');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Rate limiting
+    const clientId = getClientId(req);
+    const rateLimitResult = checkRateLimit(clientId);
+    
+    const rateLimitHeaders = {
+      'X-RateLimit-Limit': RATE_LIMIT_MAX_REQUESTS.toString(),
+      'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+      'X-RateLimit-Reset': Math.ceil(rateLimitResult.resetAt / 1000).toString(),
+    };
+
+    if (!rateLimitResult.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
@@ -30,7 +153,7 @@ serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -40,7 +163,7 @@ serve(async (req) => {
     if (claimsError || !claims?.claims?.sub) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -56,7 +179,7 @@ serve(async (req) => {
     if (!profile || profile.kyc_status !== 'approved') {
       return new Response(JSON.stringify({ error: 'KYC approval required' }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -66,12 +189,12 @@ serve(async (req) => {
     if (!type || !amount || amount <= 0) {
       return new Response(JSON.stringify({ error: 'Invalid request parameters' }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Fetch current BTC price (mock for now - in production, call a price oracle)
-    const btcPrice = 93500; // TODO: Fetch from price oracle/API
+    // Fetch real-time BTC price from oracle
+    const btcPrice = await fetchBtcPrice();
 
     // Calculate quote based on type
     let inputAmount: number;
@@ -86,7 +209,6 @@ serve(async (req) => {
 
     switch (type) {
       case 'BUY_BTC':
-        // User pays USDC, receives BTC from CoinEdge
         inputAsset = 'USDC';
         outputAsset = 'BTC';
         inputAmount = asset === 'USDC' ? amount : amount * btcPrice;
@@ -97,7 +219,6 @@ serve(async (req) => {
         break;
 
       case 'SELL_BTC':
-        // User sends BTC to CoinEdge, receives USDC
         inputAsset = 'BTC';
         outputAsset = 'USDC';
         inputAmount = asset === 'BTC' ? amount : amount / btcPrice;
@@ -109,22 +230,20 @@ serve(async (req) => {
         break;
 
       case 'CASHOUT':
-        // User sends USDC to CoinEdge, receives fiat to bank
         inputAsset = 'USDC';
         outputAsset = 'USD';
         inputAmount = amount;
         fee = inputAmount * FEE_PERCENTAGE;
         outputAmount = inputAmount - fee;
         feeAsset = 'USDC';
-        rate = 1; // 1:1 for USDC to USD
+        rate = 1;
         break;
 
       case 'REDEEM':
-        // Voucher redemption - CoinEdge sends BTC to user
         inputAsset = 'VOUCHER';
         outputAsset = 'BTC';
-        inputAmount = amount; // USD value of voucher
-        fee = 0; // No fee for redemption
+        inputAmount = amount;
+        fee = 0;
         outputAmount = inputAmount / btcPrice;
         feeAsset = 'USD';
         rate = btcPrice;
@@ -133,7 +252,7 @@ serve(async (req) => {
       default:
         return new Response(JSON.stringify({ error: 'Invalid transfer type' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
     }
 
@@ -141,9 +260,36 @@ serve(async (req) => {
     const quoteId = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-    // Store quote for validation during execution
-    // In production, store in Redis/cache with TTL
-    console.log('Quote generated:', { quoteId, type, inputAmount, outputAmount, expiresAt });
+    // Log quote for audit
+    const supabaseService = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    await supabaseService.from('audit_logs').insert({
+      action: 'QUOTE_GENERATED',
+      actor_type: 'system',
+      actor_id: userId,
+      event_id: quoteId,
+      metadata: {
+        type,
+        btc_price: btcPrice,
+        input_amount: inputAmount,
+        output_amount: outputAmount,
+        fee,
+        expires_at: expiresAt,
+      },
+    });
+
+    console.log('Quote generated:', { quoteId, type, btcPrice, inputAmount, outputAmount, expiresAt });
+
+    // Get treasury addresses from system_settings
+    const { data: settings } = await supabaseService
+      .from('system_settings')
+      .select('setting_key, setting_value')
+      .in('setting_key', ['coinedge_btc_address', 'coinedge_usdc_address']);
+    
+    const coinedgeWallet: { btc?: string; usdc?: string } = {};
+    settings?.forEach((s: { setting_key: string; setting_value: string }) => {
+      if (s.setting_key === 'coinedge_btc_address') coinedgeWallet.btc = s.setting_value;
+      if (s.setting_key === 'coinedge_usdc_address') coinedgeWallet.usdc = s.setting_value;
+    });
 
     return new Response(JSON.stringify({
       quoteId,
@@ -156,12 +302,13 @@ serve(async (req) => {
       fee,
       feeAsset,
       expiresAt,
+      priceSource: priceCache && Date.now() - priceCache.updatedAt < 1000 ? 'live' : 'cached',
       coinedgeWallet: {
-        btc: 'bc1q_coinedge_btc_wallet_placeholder',
-        usdc: '0x_coinedge_usdc_wallet_placeholder',
+        btc: coinedgeWallet.btc || 'Not configured - contact admin',
+        usdc: coinedgeWallet.usdc || 'Not configured - contact admin',
       },
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: unknown) {

@@ -21,7 +21,6 @@ verify_jwt = false
 [functions.create-all-demo-accounts]
 verify_jwt = false
 
-
 [functions.plaid-link]
 verify_jwt = false
 
@@ -56,6 +55,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.verify-usdc-transfer]
+verify_jwt = false
+
+[functions.btc-price]
 verify_jwt = false
 
 # Cron job to run fulfillment queue processing every 5 minutes
