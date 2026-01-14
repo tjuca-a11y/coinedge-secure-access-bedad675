@@ -106,7 +106,13 @@ export const useKyc = () => {
 
   // Create Plaid Identity verification link token
   const createIdentityVerificationToken = useCallback(async (): Promise<boolean> => {
+    console.log('[KYC] createIdentityVerificationToken called');
+    console.log('[KYC] effectiveUserId:', effectiveUserId);
+    console.log('[KYC] isDynamicAuthenticated:', isDynamicAuthenticated);
+    console.log('[KYC] syncedProfile:', syncedProfile);
+    
     if (!effectiveUserId) {
+      console.log('[KYC] ERROR: User not authenticated');
       setError('User not authenticated');
       return false;
     }
@@ -121,21 +127,27 @@ export const useKyc = () => {
       
       // Check for Supabase session first
       const { data: session } = await supabase.auth.getSession();
+      console.log('[KYC] Supabase session:', session.session ? 'exists' : 'null');
       
       if (session.session?.access_token) {
         // Use Supabase auth
         authToken = session.session.access_token;
+        console.log('[KYC] Using Supabase auth token');
       } else if (isDynamicAuthenticated && syncedProfile) {
         // Use Dynamic Labs auth
         authToken = getAuthToken();
+        console.log('[KYC] Using Dynamic auth token:', authToken ? 'exists' : 'null');
         // Include userId for Dynamic auth
         requestBody.userId = syncedProfile.userId;
       }
       
       if (!authToken) {
+        console.log('[KYC] ERROR: No valid authentication token');
         setError('No valid authentication token');
         return false;
       }
+      
+      console.log('[KYC] Making request to plaid-identity with body:', JSON.stringify(requestBody));
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-identity`,
@@ -149,15 +161,19 @@ export const useKyc = () => {
         }
       );
 
+      console.log('[KYC] Response status:', response.status);
       const data: PlaidIdentityResponse = await response.json();
+      console.log('[KYC] Response data:', JSON.stringify(data));
 
       if (data.mock) {
         // Plaid not configured - show demo mode message
+        console.log('[KYC] Plaid not configured - mock mode');
         setError(data.message || 'Plaid is not configured. Running in demo mode.');
         return false;
       }
 
       if (data.success && data.link_token) {
+        console.log('[KYC] Got link token successfully');
         setPlaidLinkToken(data.link_token);
         if (data.identity_verification_id) {
           setIdentityVerificationId(data.identity_verification_id);
@@ -165,6 +181,7 @@ export const useKyc = () => {
         return true;
       }
 
+      console.log('[KYC] Failed to create verification session:', data.error);
       setError(data.error || 'Failed to create verification session');
       return false;
     } catch (err) {
