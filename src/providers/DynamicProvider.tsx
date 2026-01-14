@@ -33,17 +33,18 @@ export const DynamicProvider: React.FC<DynamicProviderProps> = ({ children }) =>
       <DynamicContextProvider
         settings={{
           environmentId: DYNAMIC_ENVIRONMENT_ID,
-          walletConnectors: [
-            EthereumWalletConnectors,
-            BitcoinWalletConnectors,
-          ],
+          // Remove wallet connectors - email-only with embedded wallets
+          walletConnectors: [],
           appName: 'CoinEdge',
           appLogoUrl: '/favicon.ico',
           // Email-first authentication with automatic embedded wallet
           initialAuthenticationMode: 'connect-and-sign',
-          // Force email-only authentication
+          // Disable external wallet connections entirely
+          walletsFilter: () => [],
           // Disable social providers
           socialProvidersFilter: () => [],
+          // Hide wallet list - only show email auth
+          displaySiweStatement: false,
           // Wallet creation happens automatically after email auth
           events: {
             onAuthSuccess: (args) => {
