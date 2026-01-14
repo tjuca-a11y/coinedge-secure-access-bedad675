@@ -109,6 +109,12 @@ const Wallet: React.FC = () => {
   const performance = calculatePerformance(accountPerformanceData);
   const totalBalance = (btcBalance * currentBtcPrice) + usdcBalance;
 
+  const handleStartKyc = useCallback(() => {
+    console.log('[Wallet] Start KYC clicked');
+    toast.info('Opening KYC verification…');
+    navigate('/kyc');
+  }, [navigate]);
+
   const copyAddress = (address: string | null | undefined, asset: string) => {
     if (address) {
       navigator.clipboard.writeText(address);
@@ -328,7 +334,7 @@ const Wallet: React.FC = () => {
               ) : (
                 <div className="space-y-3">
                   <p className="text-muted-foreground">Complete KYC to view your BTC wallet</p>
-                  <Button onClick={() => navigate('/kyc')} size="sm" className="w-full">
+                  <Button onClick={handleStartKyc} size="sm" className="w-full">
                     Start KYC Verification
                   </Button>
                 </div>
@@ -382,7 +388,7 @@ const Wallet: React.FC = () => {
               ) : (
                 <div className="space-y-3">
                   <p className="text-muted-foreground">Complete KYC to view your USDC wallet</p>
-                  <Button onClick={() => navigate('/kyc')} size="sm" className="w-full">
+                  <Button onClick={handleStartKyc} size="sm" className="w-full">
                     Start KYC Verification
                   </Button>
                 </div>
