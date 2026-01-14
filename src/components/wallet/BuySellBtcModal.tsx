@@ -140,6 +140,11 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
     const result = await executeTransfer({
       quoteId: quote.quoteId,
       type: activeTab === "buy" ? "BUY_BTC" : "SELL_BTC",
+      // Pass quote data for accurate order recording
+      usdcAmount: quote.inputAmount,
+      btcAmount: quote.outputAmount,
+      btcPrice: quote.rate,
+      feeUsdc: quote.fee,
     });
 
     if (result.success) {
