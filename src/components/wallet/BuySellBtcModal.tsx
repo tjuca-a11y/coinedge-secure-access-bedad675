@@ -114,7 +114,9 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
       return;
     }
 
-    if (!btcWallet) {
+    // For Dynamic users, wallet might still be initializing - check only if NOT authenticated via Dynamic
+    // Dynamic users have embedded wallets managed by backend, so btcWallet may be null
+    if (!isDynamicAuthenticated && !btcWallet && isWalletInitializing) {
       toast.error("Wallet is still initializing, please wait...");
       return;
     }
