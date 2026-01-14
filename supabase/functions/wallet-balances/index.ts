@@ -101,6 +101,18 @@ async function fetchUsdcBalance(address: string): Promise<number> {
   }
 }
 
+// Test emails that should receive mock balances for testing
+const TEST_EMAILS = [
+  'demo@user.coinedge.com',
+  'tjuca+dynamic_test@coinedge.io',
+];
+
+// Mock balances for test accounts
+const MOCK_BALANCES = {
+  btc: 0.05432,    // ~$5,000 worth at typical BTC prices
+  usdc: 2500.00,   // $2,500 USDC for testing buy flows
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -108,6 +120,7 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
     const authHeader = req.headers.get('Authorization');
@@ -118,28 +131,52 @@ serve(async (req) => {
       });
     }
 
+    // Try to get user from Supabase auth first
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
 
-    // Get the authenticated user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    let userEmail: string | null = null;
+    let profile: { btc_address: string | null; usdc_address: string | null; email: string | null } | null = null;
+
+    if (user && !userError) {
+      // Supabase user - get profile by user_id
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('btc_address, usdc_address, email')
+        .eq('user_id', user.id)
+        .single();
+      
+      profile = profileData;
+      userEmail = user.email || profile?.email || null;
+    } else {
+      // Dynamic user - try to decode JWT to get email, or look up by token
+      // For Dynamic users, we need to find the profile by looking at the JWT claims
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Decode JWT payload (without verification - edge function trusts the auth layer)
+        const payloadBase64 = token.split('.')[1];
+        const payload = JSON.parse(atob(payloadBase64));
+        const dynamicEmail = payload.email || payload.verified_credentials?.[0]?.email;
+        
+        if (dynamicEmail) {
+          // Use service role to query profile by email
+          const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
+          const { data: profileData } = await adminSupabase
+            .from('profiles')
+            .select('btc_address, usdc_address, email')
+            .eq('email', dynamicEmail)
+            .single();
+          
+          profile = profileData;
+          userEmail = dynamicEmail;
+        }
+      } catch (decodeError) {
+        console.error('Error decoding Dynamic token:', decodeError);
+      }
     }
-
-    const userId = user.id;
-
-    // Get user profile to get wallet addresses
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('btc_address, usdc_address')
-      .eq('user_id', userId)
-      .single();
 
     if (!profile) {
       return new Response(JSON.stringify({ 
@@ -151,7 +188,26 @@ serve(async (req) => {
       });
     }
 
-    // Fetch balances from blockchain in parallel
+    // Check if this is a test account - return mock balances
+    const isTestAccount = userEmail && TEST_EMAILS.some(email => 
+      userEmail!.toLowerCase() === email.toLowerCase()
+    );
+
+    if (isTestAccount) {
+      console.log(`Returning mock balances for test account: ${userEmail}`);
+      return new Response(JSON.stringify({
+        btc: MOCK_BALANCES.btc,
+        usdc: MOCK_BALANCES.usdc,
+        btcAddress: profile.btc_address,
+        usdcAddress: profile.usdc_address,
+        lastUpdated: new Date().toISOString(),
+        isTestAccount: true,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Fetch real balances from blockchain in parallel for non-test accounts
     const [btcBalance, usdcBalance] = await Promise.all([
       profile.btc_address ? fetchBtcBalance(profile.btc_address) : Promise.resolve(0),
       profile.usdc_address ? fetchUsdcBalance(profile.usdc_address) : Promise.resolve(0),
