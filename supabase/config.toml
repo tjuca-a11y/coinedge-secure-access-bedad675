@@ -55,6 +55,9 @@ verify_jwt = false
 [functions.monitor-btc-transactions]
 verify_jwt = false
 
+[functions.verify-usdc-transfer]
+verify_jwt = false
+
 # Cron job to run fulfillment queue processing every 5 minutes
 [[cron]]
 schedule = "*/5 * * * *"

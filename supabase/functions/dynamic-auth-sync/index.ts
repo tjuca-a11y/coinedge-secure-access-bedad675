@@ -25,7 +25,8 @@ async function getJWKS(environmentId: string): Promise<jose.JWTVerifyGetKey> {
     return jwksCache;
   }
   
-  const jwksUrl = `https://app.dynamic.xyz/api/v0/sdk/${environmentId}/.well-known/jwks`;
+  // Dynamic Labs uses dynamicauth.com for JWKS
+  const jwksUrl = `https://app.dynamicauth.com/api/v0/sdk/${environmentId}/.well-known/jwks`;
   const JWKS = jose.createRemoteJWKSet(new URL(jwksUrl));
   
   jwksCache = JWKS;
@@ -37,8 +38,9 @@ async function getJWKS(environmentId: string): Promise<jose.JWTVerifyGetKey> {
 async function verifyDynamicToken(token: string, environmentId: string): Promise<jose.JWTPayload | null> {
   try {
     const JWKS = await getJWKS(environmentId);
+    // Dynamic Labs uses app.dynamicauth.com as the issuer
     const { payload } = await jose.jwtVerify(token, JWKS, {
-      issuer: `https://app.dynamic.xyz/${environmentId}`,
+      issuer: `app.dynamicauth.com/${environmentId}`,
     });
     return payload;
   } catch (error) {
@@ -78,9 +80,9 @@ serve(async (req) => {
     let environmentId: string | undefined;
     try {
       const decoded = jose.decodeJwt(dynamicToken);
-      // Issuer format: https://app.dynamic.xyz/{environmentId}
-      if (decoded.iss && decoded.iss.startsWith('https://app.dynamic.xyz/')) {
-        environmentId = decoded.iss.replace('https://app.dynamic.xyz/', '');
+      // Issuer format: app.dynamicauth.com/{environmentId}
+      if (decoded.iss && decoded.iss.startsWith('app.dynamicauth.com/')) {
+        environmentId = decoded.iss.replace('app.dynamicauth.com/', '');
       }
     } catch {
       // Continue without environment ID extraction
