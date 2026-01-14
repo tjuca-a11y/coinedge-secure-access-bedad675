@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
+import { useEffect } from "react";
 
 export interface SwapOrder {
   id: string;
@@ -22,10 +23,39 @@ export interface SwapOrder {
 export const useSwapOrders = () => {
   const { user } = useAuth();
   const { syncedProfile, isAuthenticated: isDynamicAuthenticated } = useDynamicWallet();
+  const queryClient = useQueryClient();
 
   // For Dynamic users, use the user_id from syncedProfile
   // For Supabase users, use user.id
   const userId = isDynamicAuthenticated ? syncedProfile?.userId : user?.id;
+
+  // Set up real-time subscription
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`swap-orders-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customer_swap_orders',
+          filter: `customer_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('Swap order update:', payload);
+          // Invalidate the query to refetch data
+          queryClient.invalidateQueries({ queryKey: ["swap-orders", userId] });
+          queryClient.invalidateQueries({ queryKey: ["swap-orders-pending", userId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
 
   return useQuery({
     queryKey: ["swap-orders", userId],
@@ -42,7 +72,6 @@ export const useSwapOrders = () => {
       return data as SwapOrder[];
     },
     enabled: !!userId,
-    refetchInterval: 10000, // Refetch every 10 seconds to show status updates
   });
 };
 
@@ -68,6 +97,5 @@ export const usePendingSwapOrders = () => {
       return data as SwapOrder[];
     },
     enabled: !!userId,
-    refetchInterval: 5000, // Refetch pending orders more frequently
   });
 };
