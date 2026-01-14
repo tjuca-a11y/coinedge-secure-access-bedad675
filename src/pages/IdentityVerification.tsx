@@ -27,6 +27,11 @@ const IdentityVerification: React.FC = () => {
   const navigate = useNavigate();
   const { kycStatus } = useAuth();
 
+  const handleStartVerification = () => {
+    console.log("[IdentityVerification] Start Verification clicked");
+    navigate("/kyc");
+  };
+
   const getTierStatus = () => {
     switch (kycStatus) {
       case "approved":
@@ -229,10 +234,7 @@ const IdentityVerification: React.FC = () => {
 
         {/* Start Verification Button for non-verified users */}
         {kycStatus !== "approved" && kycStatus !== "pending" && (
-          <Button 
-            className="w-full" 
-            onClick={() => navigate("/kyc")}
-          >
+          <Button className="w-full" onClick={handleStartVerification}>
             Start Verification
           </Button>
         )}
