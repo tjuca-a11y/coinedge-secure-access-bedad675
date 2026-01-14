@@ -41,6 +41,9 @@ export const DynamicProvider: React.FC<DynamicProviderProps> = ({ children }) =>
           appLogoUrl: '/favicon.ico',
           // Email-first authentication with automatic embedded wallet
           initialAuthenticationMode: 'connect-and-sign',
+          // Force email-only authentication
+          // Disable social providers
+          socialProvidersFilter: () => [],
           // Wallet creation happens automatically after email auth
           events: {
             onAuthSuccess: (args) => {
