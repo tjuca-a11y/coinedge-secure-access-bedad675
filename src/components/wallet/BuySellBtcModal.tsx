@@ -47,9 +47,15 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   btcBalance,
   usdcBalance,
 }) => {
-  const { user, isKycApproved } = useAuth();
-  const { isConnected, btcWallet, signMessage, isWalletInitializing } = useDynamicWallet();
+  const { user, isKycApproved: supabaseKycApproved } = useAuth();
+  const { isConnected, btcWallet, signMessage, isWalletInitializing, isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
   const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
+  
+  // Check auth and KYC from either source
+  const isAuthenticated = !!user || isDynamicAuthenticated;
+  const isKycApproved = isDynamicAuthenticated 
+    ? syncedProfile?.kycStatus === 'approved' 
+    : supabaseKycApproved;
   
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
@@ -98,7 +104,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!user) {
+    if (!isAuthenticated) {
       toast.error("Please sign in to continue");
       return;
     }

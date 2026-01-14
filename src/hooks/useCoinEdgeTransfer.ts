@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDynamicWallet } from '@/contexts/DynamicWalletContext';
 import { toast } from 'sonner';
+import { getAuthToken } from '@dynamic-labs/sdk-react-core';
 
 export type TransferType = 'BUY_BTC' | 'SELL_BTC' | 'REDEEM' | 'CASHOUT';
 
@@ -38,17 +39,36 @@ interface TransferResult {
 }
 
 export const useCoinEdgeTransfer = () => {
-  const { signMessage, btcWallet, ethWallet, refreshBalances } = useDynamicWallet();
+  const { signMessage, btcWallet, ethWallet, refreshBalances, isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [quote, setQuote] = useState<Quote | null>(null);
+
+  // Get auth token - prefer Supabase session, fall back to Dynamic token
+  const getAuthHeader = useCallback(async (): Promise<string | null> => {
+    // Try Supabase session first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return `Bearer ${session.access_token}`;
+    }
+    
+    // Fall back to Dynamic token
+    if (isDynamicAuthenticated) {
+      const dynamicToken = getAuthToken();
+      if (dynamicToken) {
+        return `Bearer ${dynamicToken}`;
+      }
+    }
+    
+    return null;
+  }, [isDynamicAuthenticated]);
 
   // Get a quote for a transfer
   const getQuote = useCallback(async (request: QuoteRequest): Promise<Quote | null> => {
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const authHeader = await getAuthHeader();
       
-      if (!session) {
+      if (!authHeader) {
         toast.error('Please connect your wallet first');
         return null;
       }
@@ -59,7 +79,7 @@ export const useCoinEdgeTransfer = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': authHeader,
           },
           body: JSON.stringify(request),
         }
@@ -80,15 +100,15 @@ export const useCoinEdgeTransfer = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [getAuthHeader]);
 
   // Execute a transfer (requires signing for user-initiated sends)
   const executeTransfer = useCallback(async (request: TransferRequest): Promise<TransferResult> => {
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const authHeader = await getAuthHeader();
       
-      if (!session) {
+      if (!authHeader) {
         toast.error('Please connect your wallet first');
         return { success: false, status: 'FAILED', message: 'Not authenticated' };
       }
@@ -113,7 +133,7 @@ export const useCoinEdgeTransfer = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': authHeader,
           },
           body: JSON.stringify({
             ...request,
@@ -152,14 +172,14 @@ export const useCoinEdgeTransfer = () => {
       setIsLoading(false);
       setQuote(null);
     }
-  }, [signMessage, btcWallet, ethWallet, refreshBalances]);
+  }, [signMessage, btcWallet, ethWallet, refreshBalances, getAuthHeader]);
 
   // Validate a voucher code
   const validateVoucher = useCallback(async (code: string): Promise<{ valid: boolean; amount?: number; asset?: 'BTC' | 'USDC'; error?: string }> => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const authHeader = await getAuthHeader();
       
-      if (!session) {
+      if (!authHeader) {
         return { valid: false, error: 'Not authenticated' };
       }
 
@@ -169,7 +189,7 @@ export const useCoinEdgeTransfer = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': authHeader,
           },
           body: JSON.stringify({ code }),
         }
@@ -186,7 +206,7 @@ export const useCoinEdgeTransfer = () => {
       console.error('Error validating voucher:', error);
       return { valid: false, error: 'Failed to validate voucher' };
     }
-  }, []);
+  }, [getAuthHeader]);
 
   // Clear current quote
   const clearQuote = useCallback(() => {
