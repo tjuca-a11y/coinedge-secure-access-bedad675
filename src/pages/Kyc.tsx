@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDynamicWallet } from '@/contexts/DynamicWalletContext';
 import { KycFlow } from '@/components/kyc/KycFlow';
@@ -7,6 +8,16 @@ import { KycFlow } from '@/components/kyc/KycFlow';
 const Kyc: React.FC = () => {
   const { user, loading, isKycApproved } = useAuth();
   const { isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
+
+  useEffect(() => {
+    console.log('[KYC Page] mounted', {
+      hasSupabaseUser: !!user,
+      loading,
+      isDynamicAuthenticated,
+      hasSyncedProfile: !!syncedProfile,
+    });
+    toast.info('KYC page opened');
+  }, [user, loading, isDynamicAuthenticated, syncedProfile]);
 
   // User is authenticated if they have Supabase session OR Dynamic auth with synced profile
   const isAuthenticated = !!user || (isDynamicAuthenticated && !!syncedProfile);
@@ -20,11 +31,13 @@ const Kyc: React.FC = () => {
   }
 
   if (!isAuthenticated) {
+    console.log('[KYC Page] not authenticated, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
   // If KYC is already approved, redirect to dashboard
   if (isKycApproved) {
+    console.log('[KYC Page] already approved, redirecting to /');
     return <Navigate to="/" replace />;
   }
 
