@@ -15,6 +15,7 @@ interface SyncedProfile {
   email: string;
   btcAddress?: string;
   ethAddress?: string;
+  kycStatus?: 'not_started' | 'pending' | 'approved' | 'rejected';
 }
 
 interface DynamicWalletContextType {
@@ -41,6 +42,7 @@ interface DynamicWalletContextType {
   disconnectWallet: () => Promise<void>;
   signMessage: (message: string, chain: 'BTC' | 'ETH') => Promise<string | null>;
   syncWalletToProfile: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   
   // Balance state (fetched from backend)
   btcBalance: number;
@@ -66,6 +68,7 @@ const defaultContextValue: DynamicWalletContextType = {
   disconnectWallet: async () => console.warn('Dynamic SDK not configured'),
   signMessage: async () => null,
   syncWalletToProfile: async () => console.warn('Dynamic SDK not configured'),
+  refreshProfile: async () => {},
   btcBalance: 0,
   usdcBalance: 0,
   refreshBalances: async () => {},
@@ -158,13 +161,14 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
 
           if (response.ok) {
             const data = await response.json();
-            console.log('Dynamic auth synced to Supabase:', data.userId);
-            // Store the synced profile info
+            console.log('Dynamic auth synced to Supabase:', data.userId, 'kycStatus:', data.kycStatus);
+            // Store the synced profile info including KYC status
             setSyncedProfile({
               userId: data.userId,
               email: data.email,
               btcAddress: data.btcAddress,
               ethAddress: data.ethAddress,
+              kycStatus: data.kycStatus,
             });
           } else {
             const error = await response.json();
@@ -252,6 +256,33 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
     }
   }, [btcWallet, ethWallet]);
 
+  // Refresh profile data (e.g., after KYC status changes)
+  const refreshProfile = useCallback(async () => {
+    if (!syncedProfile?.userId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('kyc_status')
+        .eq('user_id', syncedProfile.userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error refreshing profile:', error);
+        return;
+      }
+
+      if (data) {
+        setSyncedProfile(prev => prev ? {
+          ...prev,
+          kycStatus: data.kyc_status,
+        } : null);
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    }
+  }, [syncedProfile?.userId]);
+
   // Fetch balances from backend
   const refreshBalances = useCallback(async () => {
     if (!isConnected) return;
@@ -310,6 +341,7 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
         disconnectWallet,
         signMessage,
         syncWalletToProfile,
+        refreshProfile,
         btcBalance,
         usdcBalance,
         refreshBalances,

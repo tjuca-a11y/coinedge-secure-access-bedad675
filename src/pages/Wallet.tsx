@@ -1,11 +1,10 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Send, Download, Gift, Bitcoin, DollarSign, Copy, TrendingUp, TrendingDown, Minus, Building2, Shield, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
@@ -18,9 +17,6 @@ import { CashOutModal } from "@/components/wallet/CashOutModal";
 import { CashOutHistory } from "@/components/wallet/CashOutHistory";
 import { ReceiveModal } from "@/components/wallet/ReceiveModal";
 import { Badge } from "@/components/ui/badge";
-import { Database } from "@/integrations/supabase/types";
-
-type Profile = Database['public']['Tables']['profiles']['Row'];
 
 // Mock account performance data with more realistic values for demo
 const accountPerformanceData = [
@@ -52,7 +48,7 @@ const calculatePerformance = (data: typeof accountPerformanceData) => {
 const currentBtcPrice = 93327.91;
 
 const Wallet: React.FC = () => {
-  const { user: supabaseUser, profile: supabaseProfile, isKycApproved: supabaseKycApproved } = useAuth();
+  const { profile: supabaseProfile, isKycApproved: supabaseKycApproved } = useAuth();
   const { 
     isConnected, 
     btcWallet, 
@@ -60,7 +56,6 @@ const Wallet: React.FC = () => {
     btcBalance, 
     usdcBalance, 
     refreshBalances,
-    isLoading: walletLoading,
     isWalletInitializing,
     syncedProfile,
     isAuthenticated: isDynamicAuthenticated
@@ -72,42 +67,14 @@ const Wallet: React.FC = () => {
   const [usdcActionsModalOpen, setUsdcActionsModalOpen] = useState(false);
   const [cashOutModalOpen, setCashOutModalOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
-  
-  // For Dynamic users, fetch profile separately (so KYC can work even if a Supabase session/profile exists from another user)
-  const [dynamicProfile, setDynamicProfile] = useState<Profile | null>(null);
-  
-  useEffect(() => {
-    const fetchDynamicProfile = async () => {
-      if (!isDynamicAuthenticated || !syncedProfile?.userId) return;
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', syncedProfile.userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[Wallet] failed to fetch dynamic profile', error);
-        return;
-      }
-
-      setDynamicProfile(data);
-    };
-
-    fetchDynamicProfile();
-  }, [isDynamicAuthenticated, syncedProfile?.userId]);
-
-  const isSupabaseSessionForDynamicUser =
-    !!supabaseUser?.id && !!syncedProfile?.userId && supabaseUser.id === syncedProfile.userId;
-
-  // Prefer the Dynamic-linked profile when the user is authenticated via Dynamic.
-  const profile = isDynamicAuthenticated
-    ? (dynamicProfile || (isSupabaseSessionForDynamicUser ? supabaseProfile : null))
-    : supabaseProfile;
-
+  // Use centralized KYC status from syncedProfile for Dynamic users
   const isKycApproved = isDynamicAuthenticated
-    ? (profile?.kyc_status === 'approved')
+    ? syncedProfile?.kycStatus === 'approved'
     : supabaseKycApproved;
+
+  // Use profile for wallet addresses
+  const profile = isDynamicAuthenticated ? null : supabaseProfile;
   const handleRefresh = useCallback(async () => {
     await refreshBalances();
     setLastRefresh(Date.now());
