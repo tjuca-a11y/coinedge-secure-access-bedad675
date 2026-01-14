@@ -21,6 +21,9 @@ import Wallet from "./pages/Wallet";
 import SendRequest from "./pages/SendRequest";
 import Settings from "./pages/Settings";
 import IdentityVerification from "./pages/IdentityVerification";
+import ProfileSettings from "./pages/settings/ProfileSettings";
+import SecuritySettings from "./pages/settings/SecuritySettings";
+import PaymentMethodsSettings from "./pages/settings/PaymentMethodsSettings";
 import Redeem from "./pages/Redeem";
 import NotFound from "./pages/NotFound";
 
@@ -148,6 +151,9 @@ const App = () => (
                     <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
                     <Route path="/send" element={<ProtectedRoute><SendRequest /></ProtectedRoute>} />
                     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    <Route path="/settings/profile" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
+                    <Route path="/settings/security" element={<ProtectedRoute><SecuritySettings /></ProtectedRoute>} />
+                    <Route path="/settings/payment-methods" element={<ProtectedRoute><PaymentMethodsSettings /></ProtectedRoute>} />
                     <Route path="/settings/identity-verification" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
                     <Route path="/redeem" element={<ProtectedRoute><Redeem /></ProtectedRoute>} />
                     <Route path="*" element={<NotFound />} />
