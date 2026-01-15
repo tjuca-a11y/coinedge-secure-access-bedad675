@@ -16,6 +16,7 @@ import { SwapOrderHistory } from "@/components/wallet/SwapOrderHistory";
 import { CashOutModal } from "@/components/wallet/CashOutModal";
 import { CashOutHistory } from "@/components/wallet/CashOutHistory";
 import { ReceiveModal } from "@/components/wallet/ReceiveModal";
+import { BankAccountsCard } from "@/components/wallet/BankAccountsCard";
 import { Badge } from "@/components/ui/badge";
 
 // Mock account performance data with more realistic values for demo
@@ -376,6 +377,9 @@ const Wallet: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Bank Accounts Card */}
+        {isKycApproved && <BankAccountsCard />}
 
         {/* Order History */}
         {isKycApproved && (

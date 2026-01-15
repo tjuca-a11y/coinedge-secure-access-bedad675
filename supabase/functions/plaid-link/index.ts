@@ -231,27 +231,56 @@ serve(async (req) => {
       const accountsData = await accountsResponse.json();
       const accounts = accountsData.accounts || [];
 
-      // Save accounts to database
+      // Upsert accounts to database (prevent duplicates on re-link)
       const savedAccounts: Record<string, unknown>[] = [];
       for (const account of accounts) {
-        const { data: accountData } = await supabase
+        // Check if account already exists
+        const { data: existing } = await supabase
           .from('user_bank_accounts')
-          .insert({
-            user_id: userId,
-            plaid_access_token: exchangeData.access_token,
-            plaid_account_id: account.account_id,
-            plaid_item_id: exchangeData.item_id,
-            bank_name: account.name || 'Bank Account',
-            account_mask: account.mask || '****',
-            account_type: account.subtype === 'savings' ? 'savings' : 'checking',
-            is_verified: true,
-            is_primary: savedAccounts.length === 0, // First account is primary
-          })
-          .select()
-          .single();
+          .select('id, is_primary')
+          .eq('user_id', userId)
+          .eq('plaid_item_id', exchangeData.item_id)
+          .eq('plaid_account_id', account.account_id)
+          .maybeSingle();
 
-        if (accountData) {
-          savedAccounts.push(accountData);
+        if (existing) {
+          // Update existing account
+          const { data: accountData } = await supabase
+            .from('user_bank_accounts')
+            .update({
+              plaid_access_token: exchangeData.access_token,
+              bank_name: account.name || 'Bank Account',
+              account_mask: account.mask || '****',
+              account_type: account.subtype === 'savings' ? 'savings' : 'checking',
+              is_verified: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id)
+            .select()
+            .single();
+          if (accountData) {
+            savedAccounts.push(accountData);
+          }
+        } else {
+          // Insert new account
+          const { data: accountData } = await supabase
+            .from('user_bank_accounts')
+            .insert({
+              user_id: userId,
+              plaid_access_token: exchangeData.access_token,
+              plaid_account_id: account.account_id,
+              plaid_item_id: exchangeData.item_id,
+              bank_name: account.name || 'Bank Account',
+              account_mask: account.mask || '****',
+              account_type: account.subtype === 'savings' ? 'savings' : 'checking',
+              is_verified: true,
+              is_primary: savedAccounts.length === 0, // First account is primary
+            })
+            .select()
+            .single();
+          if (accountData) {
+            savedAccounts.push(accountData);
+          }
         }
       }
 
