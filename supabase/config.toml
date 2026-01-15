@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.create-all-demo-accounts]
 verify_jwt = false
 
+[functions.create-demo-super-admin]
+verify_jwt = false
+
 [functions.plaid-link]
 verify_jwt = false
 
