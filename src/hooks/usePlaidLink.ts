@@ -9,12 +9,14 @@ interface UsePlaidLinkResult {
   openPlaidLink: () => Promise<void>;
   isLoading: boolean;
   isReady: boolean;
+  isPlaidOpen: boolean;
   error: string | null;
 }
 
 export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlaidOpen, setIsPlaidOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -41,6 +43,7 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
 
   // Handle successful link
   const handleSuccess: PlaidLinkOnSuccess = useCallback(async (publicToken, metadata) => {
+    setIsPlaidOpen(false);
     setIsLoading(true);
     setError(null);
     
@@ -93,6 +96,7 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
       if (err) {
         console.log('Plaid Link exit error:', err);
       }
+      setIsPlaidOpen(false);
       setLinkToken(null);
     },
   };
@@ -135,7 +139,7 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
 
       if (data.link_token) {
         setLinkToken(data.link_token);
-        // The useEffect in usePlaidLinkSDK will open when ready
+        // The useEffect will open when ready
       } else {
         throw new Error(data.error || 'Failed to initialize bank linking');
       }
@@ -150,6 +154,7 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
   // Open Plaid Link when token is ready
   useEffect(() => {
     if (linkToken && ready) {
+      setIsPlaidOpen(true);
       open();
       setIsLoading(false);
     }
@@ -159,6 +164,7 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
     openPlaidLink,
     isLoading,
     isReady: ready,
+    isPlaidOpen,
     error,
   };
 };
