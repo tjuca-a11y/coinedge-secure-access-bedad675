@@ -12,9 +12,12 @@ import {
   CheckCircle,
   Trash2,
   Star,
-  AlertCircle
+  AlertCircle,
+  User,
+  Wallet
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -32,7 +35,8 @@ interface BankAccount {
 
 const PaymentMethodsSettings: React.FC = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { isAuthenticated: isDynamicAuth, syncedProfile, dynamicUser } = useDynamicWallet();
   const queryClient = useQueryClient();
   const { openPlaidLink, isReady: plaidReady } = usePlaidLink(() => {
     // refresh after linking
@@ -40,7 +44,11 @@ const PaymentMethodsSettings: React.FC = () => {
   });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const profileId = profile?.id;
+  // Determine identity source and profile ID
+  const isEmailAuth = !!user && !isDynamicAuth;
+  const isWalletAuth = isDynamicAuth;
+  const profileId = isWalletAuth ? syncedProfile?.userId : profile?.id;
+  const identityEmail = isWalletAuth ? (dynamicUser?.email || syncedProfile?.email) : user?.email;
 
   const { data: bankAccounts = [], isLoading } = useQuery({
     queryKey: ["bank-accounts", profileId],
@@ -146,6 +154,38 @@ const PaymentMethodsSettings: React.FC = () => {
             <p className="text-muted-foreground">Manage your funding sources and withdrawal destinations</p>
           </div>
         </div>
+
+        {/* Identity Panel */}
+        <Card className="border-muted bg-muted/30">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-background">
+                {isWalletAuth ? (
+                  <Wallet className="h-4 w-4 text-primary" />
+                ) : (
+                  <User className="h-4 w-4 text-primary" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Signed in as</span>
+                  <Badge variant="outline" className="text-xs">
+                    {isWalletAuth ? 'Wallet' : 'Email'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {identityEmail || 'No email'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Profile ID</p>
+                <code className="text-xs font-mono text-muted-foreground">
+                  {profileId ? `${profileId.slice(0, 8)}…` : 'none'}
+                </code>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Info Banner */}
         <Card className="border-primary/30 bg-primary/5">
