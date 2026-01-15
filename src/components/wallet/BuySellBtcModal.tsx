@@ -55,8 +55,10 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
   
   // Plaid bank linking hook - track when Plaid modal is open to hide this dialog
-  const { openPlaidLink, isLoading: isPlaidLoading, isPlaidOpen } = usePlaidLink(() => {
-    refetchAccounts(); // Refresh bank accounts after successful link
+  const { openPlaidLink, isLoading: isPlaidLoading, isPlaidOpen } = usePlaidLink(async () => {
+    // Wait a moment for the database to update, then refetch
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await refetchAccounts();
     toast.success("Bank account connected!");
   });
   
