@@ -34,31 +34,39 @@ const PaymentMethodsSettings: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const { openPlaidLink, isReady: plaidReady } = usePlaidLink();
+  const { openPlaidLink, isReady: plaidReady } = usePlaidLink(() => {
+    // refresh after linking
+    queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+  });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const profileId = profile?.id;
+
   const { data: bankAccounts = [], isLoading } = useQuery({
-    queryKey: ["bank-accounts", profile?.user_id],
+    queryKey: ["bank-accounts", profileId],
     queryFn: async () => {
-      if (!profile?.user_id) return [];
+      if (!profileId) return [];
       const { data, error } = await supabase
         .from("user_bank_accounts_public")
         .select("id, bank_name, account_mask, account_type, is_verified, is_primary, created_at, user_id")
+        .eq("user_id", profileId)
         .order("is_primary", { ascending: false });
 
       if (error) throw error;
       return (data || []) as BankAccount[];
     },
-    enabled: !!profile?.user_id,
+    enabled: !!profileId,
   });
 
   const setPrimaryMutation = useMutation({
     mutationFn: async (accountId: string) => {
+      if (!profileId) throw new Error('Not signed in');
+
       // First unset all as non-primary
       await supabase
         .from("user_bank_accounts")
         .update({ is_primary: false })
-        .eq("user_id", profile?.user_id);
+        .eq("user_id", profileId);
 
       // Then set the selected as primary
       const { error } = await supabase
