@@ -64,8 +64,11 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   const removeAccount = useRemoveBankAccount();
   
   // Plaid Link integration - track when Plaid modal is open
-  const { openPlaidLink, isLoading: isLinkingBank, isPlaidOpen, error: linkError } = usePlaidLink(() => {
-    refetchAccounts();
+  const { openPlaidLink, isLoading: isLinkingBank, isPlaidOpen, error: linkError } = usePlaidLink(async () => {
+    // Wait a moment for the database to update, then refetch
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await refetchAccounts();
+    toast.success("Bank account connected!");
   });
 
   // Auto-select primary account
