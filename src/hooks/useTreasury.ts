@@ -190,7 +190,17 @@ export const useUserBankAccounts = (userId?: string) => {
       if (!effectiveUserId) {
         // Try Supabase session
         const { data: { user } } = await supabase.auth.getUser();
-        effectiveUserId = user?.id;
+
+        if (user?.id) {
+          // Map auth user id -> profile id (our app uses profile.id as the user_id foreign key)
+          const { data: profileRow } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          effectiveUserId = profileRow?.id || user.id;
+        }
       }
 
       if (!effectiveUserId) {
