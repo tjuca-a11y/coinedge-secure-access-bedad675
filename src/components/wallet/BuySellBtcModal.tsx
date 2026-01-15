@@ -50,9 +50,17 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   btcBalance,
   usdcBalance,
 }) => {
-  const { user, isKycApproved: supabaseKycApproved } = useAuth();
+  const { user, profile, isKycApproved: supabaseKycApproved } = useAuth();
   const { isConnected, btcWallet, signMessage, isWalletInitializing, isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
   const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
+  
+  // Determine the correct user ID for bank accounts
+  // For Dynamic (wallet) auth: use syncedProfile.userId
+  // For email auth: use profile.id (which is the profiles table primary key)
+  const effectiveUserId = isDynamicAuthenticated ? syncedProfile?.userId : profile?.id;
+  
+  // Bank accounts - pass the effective user ID
+  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts(effectiveUserId);
   
   // Plaid bank linking hook - track when Plaid modal is open to hide this dialog
   const { openPlaidLink, isLoading: isPlaidLoading, isPlaidOpen } = usePlaidLink(async () => {
@@ -73,9 +81,6 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("usdc_wallet");
   const [sellDestination, setSellDestination] = useState<SellDestination>("usdc_wallet");
   const [showQuote, setShowQuote] = useState(false);
-
-  // Bank accounts for sell-to-bank flow - pass Dynamic user ID if available
-  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts(syncedProfile?.userId);
   const createCashout = useCreateCashoutOrder();
   const removeAccount = useRemoveBankAccount();
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
