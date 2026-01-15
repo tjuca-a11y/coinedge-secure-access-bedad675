@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { useCoinEdgeTransfer } from "@/hooks/useCoinEdgeTransfer";
+import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -51,6 +52,12 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const { isConnected, btcWallet, signMessage, isWalletInitializing, isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
   const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
   
+  // Plaid bank linking hook
+  const { openPlaidLink, isLoading: isPlaidLoading } = usePlaidLink(() => {
+    setIsPlaidConnected(true);
+    toast.success("Bank account connected! You can now buy BTC with your bank.");
+  });
+  
   // Check auth and KYC from either source
   const isAuthenticated = !!user || isDynamicAuthenticated;
   const isKycApproved = isDynamicAuthenticated 
@@ -83,7 +90,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   }, [activeTab, clearQuote]);
 
   const handleConnectPlaid = () => {
-    toast.info("Plaid integration coming soon! For now, please use your USDC wallet.");
+    openPlaidLink();
   };
 
   const handleGetQuote = async () => {
@@ -286,10 +293,20 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
               <Button
                 variant="outline"
                 onClick={handleConnectPlaid}
+                disabled={isPlaidLoading}
                 className="w-full gap-2"
               >
-                <Building2 className="h-4 w-4" />
-                Connect Bank Account
+                {isPlaidLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="h-4 w-4" />
+                    Connect Bank Account
+                  </>
+                )}
               </Button>
             )}
 
