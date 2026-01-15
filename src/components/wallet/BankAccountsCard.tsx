@@ -3,11 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useUserBankAccounts } from "@/hooks/useTreasury";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
 
 export const BankAccountsCard: React.FC = () => {
-  const { syncedProfile } = useDynamicWallet();
-  const { data: accounts = [], dataUpdatedAt, isLoading } = useUserBankAccounts(syncedProfile?.userId);
+  const { isAuthenticated: isDynamicAuthenticated } = useDynamicWallet();
+  const { profile } = useAuth();
+
+  // If Dynamic wallet auth is active, do NOT pass a userId (browser may not have a backend session).
+  // The hook will fetch via the backend function using the Dynamic token.
+  const bankAccountsUserId = isDynamicAuthenticated ? undefined : profile?.user_id;
+  const { data: accounts = [], dataUpdatedAt, isLoading } = useUserBankAccounts(bankAccountsUserId);
 
   const accountCount = accounts.length;
   const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
@@ -29,7 +35,7 @@ export const BankAccountsCard: React.FC = () => {
         ) : accountCount > 0 ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <CheckCircle2 className="h-4 w-4 text-success" />
               <span className="font-medium">
                 {accountCount} {accountCount === 1 ? "account" : "accounts"} linked
               </span>
