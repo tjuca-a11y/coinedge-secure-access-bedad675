@@ -228,15 +228,43 @@ export const useRemoveBankAccount = () => {
 
   return useMutation({
     mutationFn: async (accountId: string) => {
-      const { error } = await supabase
-        .from('user_bank_accounts')
-        .delete()
-        .eq('id', accountId);
+      // Works for both auth modes:
+      // - email/password: uses Supabase session token
+      // - Dynamic wallet: uses Dynamic auth token
+      const { data: session } = await supabase.auth.getSession();
+      const supabaseAccessToken = session.session?.access_token;
 
-      if (error) throw error;
+      let token = supabaseAccessToken || null;
+      if (!token) {
+        try {
+          token = getAuthToken() || null;
+        } catch {
+          token = null;
+        }
+      }
+
+      if (!token) throw new Error('Please sign in to remove a bank account');
+
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'remove_account', account_id: accountId }),
+      });
+
+      const json = await resp.json();
+
+      if (!resp.ok) {
+        throw new Error(json?.error || 'Failed to remove bank account');
+      }
+
+      return true;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast({ title: 'Bank account removed' });
     },
     onError: (error) => {
