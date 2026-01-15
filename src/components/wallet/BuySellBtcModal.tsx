@@ -56,7 +56,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   
   // Plaid bank linking hook - track when Plaid modal is open to hide this dialog
   const { openPlaidLink, isLoading: isPlaidLoading, isPlaidOpen } = usePlaidLink(() => {
-    setIsPlaidConnected(true);
+    refetchAccounts(); // Refresh bank accounts after successful link
     toast.success("Bank account connected!");
   });
   
@@ -70,7 +70,6 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("usdc_wallet");
   const [sellDestination, setSellDestination] = useState<SellDestination>("usdc_wallet");
-  const [isPlaidConnected, setIsPlaidConnected] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
 
   // Bank accounts for sell-to-bank flow - pass Dynamic user ID if available
@@ -78,6 +77,9 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const createCashout = useCreateCashoutOrder();
   const removeAccount = useRemoveBankAccount();
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+
+  // Derive connected state from actual bank accounts data (not local state)
+  const hasBankAccounts = bankAccounts && bankAccounts.length > 0;
 
   // Auto-select primary bank account
   useEffect(() => {
@@ -352,18 +354,18 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
                   <Building2 className="h-5 w-5 text-primary" />
                   <span className="text-sm font-medium">Bank Account</span>
                   <span className="text-xs text-muted-foreground">
-                    {isPlaidConnected ? "Connected" : "Via Plaid"}
+                    {hasBankAccounts ? "Connected" : "Via Plaid"}
                   </span>
                 </Label>
               </RadioGroup>
             </div>
 
-            {/* Plaid Connect Button */}
-            {paymentMethod === "plaid_bank" && !isPlaidConnected && (
+            {/* Plaid Connect Button - only show if no bank accounts linked */}
+            {paymentMethod === "plaid_bank" && !hasBankAccounts && (
               <Button
                 variant="outline"
                 onClick={handleConnectPlaid}
-                disabled={isPlaidLoading}
+                disabled={isPlaidLoading || loadingAccounts}
                 className="w-full gap-2"
               >
                 {isPlaidLoading ? (
@@ -461,7 +463,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
                 !amount || 
                 isWalletInitializing ||
                 (paymentMethod === "usdc_wallet" && totalCost > usdcBalance) ||
-                (paymentMethod === "plaid_bank" && !isPlaidConnected)
+                (paymentMethod === "plaid_bank" && !hasBankAccounts)
               }
               className="w-full"
             >
