@@ -22,7 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
-import { useUserBankAccounts, type UserBankAccount } from "@/hooks/useTreasury";
+import { useUserBankAccounts, useRemoveBankAccount, type UserBankAccount } from "@/hooks/useTreasury";
 
 type BankAccount = UserBankAccount;
 // BankAccount type comes from treasury hooks
@@ -76,26 +76,7 @@ const PaymentMethodsSettings: React.FC = () => {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (accountId: string) => {
-      const { error } = await supabase
-        .from("user_bank_accounts")
-        .delete()
-        .eq("id", accountId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
-      toast.success("Bank account removed");
-      setDeletingId(null);
-    },
-    onError: () => {
-      toast.error("Failed to remove bank account");
-      setDeletingId(null);
-    },
-  });
-
+  const removeBankAccount = useRemoveBankAccount();
   const handleAddBank = async () => {
     if (plaidReady) {
       openPlaidLink();
@@ -108,9 +89,13 @@ const PaymentMethodsSettings: React.FC = () => {
     setPrimaryMutation.mutate(accountId);
   };
 
-  const handleDelete = (accountId: string) => {
+  const handleDelete = async (accountId: string) => {
     setDeletingId(accountId);
-    deleteMutation.mutate(accountId);
+    try {
+      await removeBankAccount.mutateAsync(accountId);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getBankIcon = (bankName: string) => {
