@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { useUserBankAccounts, useCreateCashoutOrder, useRemoveBankAccount } from "@/hooks/useTreasury";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { KycBanner } from "@/components/kyc/KycBanner";
@@ -44,12 +45,21 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   usdcBalance,
   currentBtcPrice,
 }) => {
-  const { user, isKycApproved } = useAuth();
+  const { user, isKycApproved: supabaseKycApproved } = useAuth();
+  const { isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
+  
+  // Check auth and KYC from either source
+  const isAuthenticated = !!user || isDynamicAuthenticated;
+  const isKycApproved = isDynamicAuthenticated 
+    ? syncedProfile?.kycStatus === 'approved' 
+    : supabaseKycApproved;
+  
   const [sourceAsset, setSourceAsset] = useState<SourceAsset>("USDC");
   const [amount, setAmount] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
-  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts();
+  // Pass Dynamic user ID if available
+  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts(syncedProfile?.userId);
   const createCashout = useCreateCashoutOrder();
   const removeAccount = useRemoveBankAccount();
   
@@ -77,7 +87,7 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   const insufficientBalance = usdAmount > maxBalance;
 
   const handleConnectBank = () => {
-    if (!user) {
+    if (!isAuthenticated) {
       toast.error("Please sign in first");
       return;
     }
@@ -98,7 +108,7 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!user) {
+    if (!isAuthenticated) {
       toast.error("Please sign in first");
       return;
     }

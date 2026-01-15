@@ -73,8 +73,8 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const [isPlaidConnected, setIsPlaidConnected] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
 
-  // Bank accounts for sell-to-bank flow
-  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts();
+  // Bank accounts for sell-to-bank flow - pass Dynamic user ID if available
+  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts(syncedProfile?.userId);
   const createCashout = useCreateCashoutOrder();
   const removeAccount = useRemoveBankAccount();
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
