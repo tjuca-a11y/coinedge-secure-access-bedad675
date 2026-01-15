@@ -54,8 +54,8 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const { isConnected, btcWallet, signMessage, isWalletInitializing, isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
   const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
   
-  // Plaid bank linking hook
-  const { openPlaidLink, isLoading: isPlaidLoading } = usePlaidLink(() => {
+  // Plaid bank linking hook - track when Plaid modal is open to hide this dialog
+  const { openPlaidLink, isLoading: isPlaidLoading, isPlaidOpen } = usePlaidLink(() => {
     setIsPlaidConnected(true);
     toast.success("Bank account connected!");
   });
@@ -239,8 +239,11 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
     setShowQuote(false);
   };
 
+  // Hide this dialog when Plaid modal is open to prevent z-index conflicts
+  const effectiveOpen = open && !isPlaidOpen;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

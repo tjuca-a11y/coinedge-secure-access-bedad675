@@ -63,8 +63,8 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   const createCashout = useCreateCashoutOrder();
   const removeAccount = useRemoveBankAccount();
   
-  // Plaid Link integration
-  const { openPlaidLink, isLoading: isLinkingBank, error: linkError } = usePlaidLink(() => {
+  // Plaid Link integration - track when Plaid modal is open
+  const { openPlaidLink, isLoading: isLinkingBank, isPlaidOpen, error: linkError } = usePlaidLink(() => {
     refetchAccounts();
   });
 
@@ -153,8 +153,11 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
     setAmount((max * pct).toFixed(2));
   };
 
+  // Hide this dialog when Plaid modal is open to prevent z-index conflicts
+  const effectiveOpen = open && !isPlaidOpen;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
