@@ -53,14 +53,12 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const { user, profile, isKycApproved: supabaseKycApproved } = useAuth();
   const { isConnected, btcWallet, signMessage, isWalletInitializing, isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
   const { getQuote, executeTransfer, isLoading, quote, clearQuote } = useCoinEdgeTransfer();
-  
-  // Determine the correct user ID for bank accounts
-  // For Dynamic (wallet) auth: use syncedProfile.userId
-  // For email auth: use profile.user_id (the Supabase auth user ID, NOT profile.id)
-  const effectiveUserId = isDynamicAuthenticated ? syncedProfile?.userId : profile?.user_id;
-  
-  // Bank accounts - pass the effective user ID
-  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts(effectiveUserId);
+  // Bank accounts
+  // - Email auth: pass the Supabase auth user id (profile.user_id) and query the public view
+  // - Dynamic wallet auth: DO NOT pass a userId (browser may not have a Supabase session);
+  //   the hook will call the backend function using the Dynamic token.
+  const bankAccountsUserId = isDynamicAuthenticated ? undefined : profile?.user_id;
+  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts(bankAccountsUserId);
   
   // Plaid bank linking hook - track when Plaid modal is open to hide this dialog
   const { openPlaidLink, isLoading: isPlaidLoading, isPlaidOpen } = usePlaidLink(async () => {
