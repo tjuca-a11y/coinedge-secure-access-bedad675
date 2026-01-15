@@ -173,13 +173,26 @@ export const useUserBankAccounts = (userId?: string) => {
     queryFn: async () => {
       // Determine effective user ID
       let effectiveUserId = userId;
-      
+
+      if (!effectiveUserId) {
+        // Try persisted Dynamic->backend user id (available even when Supabase session is not)
+        try {
+          const raw = localStorage.getItem('dynamic_synced_profile');
+          const parsed = raw ? (JSON.parse(raw) as { userId?: string }) : null;
+          if (parsed?.userId) {
+            effectiveUserId = parsed.userId;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       if (!effectiveUserId) {
         // Try Supabase session
         const { data: { user } } = await supabase.auth.getUser();
         effectiveUserId = user?.id;
       }
-      
+
       if (!effectiveUserId) {
         // No user ID available, return empty array
         return [];

@@ -91,7 +91,14 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
   const [usdcBalance, setUsdcBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isWalletInitializing, setIsWalletInitializing] = useState(false);
-  const [syncedProfile, setSyncedProfile] = useState<SyncedProfile | null>(null);
+  const [syncedProfile, setSyncedProfile] = useState<SyncedProfile | null>(() => {
+    try {
+      const raw = localStorage.getItem('dynamic_synced_profile');
+      return raw ? (JSON.parse(raw) as SyncedProfile) : null;
+    } catch {
+      return null;
+    }
+  });
   
   // Derive isAuthenticated from user presence
   const isAuthenticated = !!dynamicUser;
@@ -163,13 +170,19 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
             const data = await response.json();
             console.log('Dynamic auth synced to Supabase:', data.userId, 'kycStatus:', data.kycStatus);
             // Store the synced profile info including KYC status
-            setSyncedProfile({
+            const nextProfile: SyncedProfile = {
               userId: data.userId,
               email: data.email,
               btcAddress: data.btcAddress,
               ethAddress: data.ethAddress,
               kycStatus: data.kycStatus,
-            });
+            };
+            setSyncedProfile(nextProfile);
+            try {
+              localStorage.setItem('dynamic_synced_profile', JSON.stringify(nextProfile));
+            } catch {
+              // ignore storage errors
+            }
           } else {
             const error = await response.json();
             console.error('Failed to sync Dynamic auth:', error);
@@ -192,6 +205,11 @@ const DynamicWalletProviderInternal: React.FC<{ children: React.ReactNode }> = (
       setBtcBalance(0);
       setUsdcBalance(0);
       setSyncedProfile(null);
+      try {
+        localStorage.removeItem('dynamic_synced_profile');
+      } catch {
+        // ignore
+      }
       toast.success('Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
