@@ -45,9 +45,10 @@ const PaymentMethodsSettings: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Determine identity source and profile ID
+  // IMPORTANT: Use profile.user_id (Supabase auth ID) for bank accounts, NOT profile.id
   const isEmailAuth = !!user && !isDynamicAuth;
   const isWalletAuth = isDynamicAuth;
-  const profileId = isWalletAuth ? syncedProfile?.userId : profile?.id;
+  const profileId = isWalletAuth ? syncedProfile?.userId : profile?.user_id;
   const identityEmail = isWalletAuth ? (dynamicUser?.email || syncedProfile?.email) : user?.email;
 
   const { data: bankAccounts = [], isLoading } = useQuery({

@@ -56,8 +56,8 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   
   // Determine the correct user ID for bank accounts
   // For Dynamic (wallet) auth: use syncedProfile.userId
-  // For email auth: use profile.id (which is the profiles table primary key)
-  const effectiveUserId = isDynamicAuthenticated ? syncedProfile?.userId : profile?.id;
+  // For email auth: use profile.user_id (the Supabase auth user ID, NOT profile.id)
+  const effectiveUserId = isDynamicAuthenticated ? syncedProfile?.userId : profile?.user_id;
   
   // Bank accounts - pass the effective user ID
   const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts(effectiveUserId);
