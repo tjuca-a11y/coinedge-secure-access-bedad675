@@ -66,6 +66,30 @@ export interface CashoutOrder {
 }
 
 // =====================================================
+// Helper: Get auth token for API calls (Supabase or Dynamic)
+// =====================================================
+
+const getAuthTokenForApi = async (): Promise<string | null> => {
+  // Try Supabase session first
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    return session.access_token;
+  }
+  
+  // Try Dynamic Labs token from localStorage
+  try {
+    const dynamicToken = localStorage.getItem('dynamic_authentication_token');
+    if (dynamicToken) {
+      return dynamicToken;
+    }
+  } catch {
+    // localStorage not available
+  }
+  
+  return null;
+};
+
+// =====================================================
 // USDC Inventory Hooks
 // =====================================================
 
@@ -143,14 +167,29 @@ export const useCreateUsdcInventoryLot = () => {
 // Bank Account Hooks
 // =====================================================
 
-export const useUserBankAccounts = () => {
+export const useUserBankAccounts = (userId?: string) => {
   return useQuery({
-    queryKey: ['user-bank-accounts'],
+    queryKey: ['user-bank-accounts', userId],
     queryFn: async () => {
+      // Determine effective user ID
+      let effectiveUserId = userId;
+      
+      if (!effectiveUserId) {
+        // Try Supabase session
+        const { data: { user } } = await supabase.auth.getUser();
+        effectiveUserId = user?.id;
+      }
+      
+      if (!effectiveUserId) {
+        // No user ID available, return empty array
+        return [];
+      }
+
       // Use the secure view that excludes sensitive columns like plaid_access_token
       const { data, error } = await supabase
         .from('user_bank_accounts_public')
         .select('id, bank_name, account_mask, account_type, is_verified, is_primary, created_at, user_id')
+        .eq('user_id', effectiveUserId)
         .order('is_primary', { ascending: false });
 
       if (error) throw error;
@@ -209,6 +248,10 @@ export const useCashoutOrders = (filters?: { userId?: string; status?: string })
   });
 };
 
+/**
+ * Create a cashout order via the plaid-transfer edge function.
+ * This works for both Supabase and Dynamic users.
+ */
 export const useCreateCashoutOrder = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -220,34 +263,38 @@ export const useCreateCashoutOrder = () => {
       source_amount: number;
       usd_amount: number;
     }) => {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Not authenticated');
-
-      // Calculate fee (0.5% min $1)
-      const fee_usd = Math.max(1, order.usd_amount * 0.005);
-
-      // Calculate estimated arrival (3 business days)
-      const arrivalDate = new Date();
-      let daysAdded = 0;
-      while (daysAdded < 3) {
-        arrivalDate.setDate(arrivalDate.getDate() + 1);
-        const day = arrivalDate.getDay();
-        if (day !== 0 && day !== 6) daysAdded++;
+      // Get auth token (Supabase or Dynamic)
+      const token = await getAuthTokenForApi();
+      if (!token) {
+        throw new Error('Not authenticated');
       }
 
-      const { data, error } = await supabase
-        .from('cashout_orders')
-        .insert({
-          user_id: user.user.id,
-          ...order,
-          fee_usd,
-          estimated_arrival: arrivalDate.toISOString().split('T')[0],
-          status: 'PENDING',
-        })
-        .select()
-        .single();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/plaid-transfer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'initiate_cashout',
+          bank_account_id: order.bank_account_id,
+          amount_usd: order.usd_amount,
+          source_asset: order.source_asset,
+        }),
+      });
 
-      if (error) throw error;
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create cashout order');
+      }
+      
+      if (!data.success) {
+        throw new Error(data.error || data.message || 'Failed to create cashout order');
+      }
+      
       return data;
     },
     onSuccess: () => {

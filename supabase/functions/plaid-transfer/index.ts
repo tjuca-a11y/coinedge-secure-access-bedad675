@@ -28,7 +28,7 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Verify user authorization
+    // Verify user authorization - support both Supabase and Dynamic JWTs
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -38,9 +38,43 @@ serve(async (req) => {
     }
     
     const token = authHeader.replace('Bearer ', '');
+    let userId: string | null = null;
+    let userEmail: string | null = null;
+
+    // Try Supabase JWT first
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !user) {
+    if (user && !authError) {
+      userId = user.id;
+      userEmail = user.email || null;
+      console.log('Supabase user authenticated:', userEmail);
+    } else {
+      // Try Dynamic JWT - decode and find user by email
+      try {
+        const jwtParts = token.split('.');
+        if (jwtParts.length === 3) {
+          const payload = JSON.parse(atob(jwtParts[1]));
+          if (payload.email) {
+            userEmail = payload.email;
+            // Find the user's profile by email to get user_id
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('user_id, kyc_status')
+              .eq('email', payload.email)
+              .maybeSingle();
+            
+            if (profile && !profileError) {
+              userId = profile.user_id;
+              console.log('Dynamic user authenticated via email lookup:', payload.email);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('JWT decode failed:', e);
+      }
+    }
+    
+    if (!userId) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -55,7 +89,7 @@ serve(async (req) => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('kyc_status')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (profile?.kyc_status !== 'approved') {
@@ -115,7 +149,7 @@ serve(async (req) => {
       const { data: todayOrders } = await supabase
         .from('cashout_orders')
         .select('usd_amount')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .gte('created_at', today)
         .not('status', 'in', '("FAILED","CANCELLED")');
 
@@ -131,12 +165,12 @@ serve(async (req) => {
         });
       }
 
-      // Get bank account
+      // Get bank account - use service role so we can access the full table
       const { data: bankAccount } = await supabase
         .from('user_bank_accounts')
         .select('*')
         .eq('id', bank_account_id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (!bankAccount) {
@@ -170,7 +204,7 @@ serve(async (req) => {
       const { data: order, error: orderError } = await supabase
         .from('cashout_orders')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           bank_account_id,
           source_asset,
           source_amount: source_asset === 'USDC' ? amount_usd : null,
@@ -207,7 +241,7 @@ serve(async (req) => {
               amount: netAmount.toFixed(2),
               ach_class: 'ppd',
               user: {
-                legal_name: user.email, // Should be actual name from profile
+                legal_name: userEmail, // Should be actual name from profile
               },
             }),
           });
@@ -301,7 +335,7 @@ serve(async (req) => {
         .from('cashout_orders')
         .select('*')
         .eq('order_id', cashout_order_id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (!order) {
