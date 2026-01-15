@@ -36,9 +36,41 @@ serve(async (req) => {
     }
     
     const token = authHeader.replace('Bearer ', '');
+    let userId: string | null = null;
+    
+    // Try Supabase JWT first
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !user) {
+    if (user && !authError) {
+      userId = user.id;
+    } else {
+      // Try to verify as Dynamic JWT and find the associated Supabase user
+      try {
+        // Decode the JWT to get the Dynamic user ID and email
+        const jwtParts = token.split('.');
+        if (jwtParts.length === 3) {
+          const payload = JSON.parse(atob(jwtParts[1]));
+          
+          if (payload.email) {
+            // Find the Supabase user by email from profiles
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('user_id, email')
+              .eq('email', payload.email)
+              .maybeSingle();
+              
+            if (profile) {
+              userId = profile.user_id;
+              console.log('Dynamic user authenticated via email lookup:', payload.email);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse Dynamic JWT:', e);
+      }
+    }
+    
+    if (!userId) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -53,7 +85,7 @@ serve(async (req) => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('kyc_status')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (profile?.kyc_status !== 'approved') {
@@ -84,11 +116,11 @@ serve(async (req) => {
       }
       
       if (action === 'get_accounts') {
-        // Return mock accounts for development
+        // Return accounts from database for development
         const { data: accounts } = await supabase
           .from('user_bank_accounts')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: false });
         
         return new Response(JSON.stringify({
@@ -125,7 +157,7 @@ serve(async (req) => {
         body: JSON.stringify({
           client_id: plaidClientId,
           secret: plaidSecret,
-          user: { client_user_id: user.id },
+          user: { client_user_id: userId },
           client_name: 'CoinEdge',
           products: ['auth', 'transfer'],
           country_codes: ['US'],
@@ -198,7 +230,6 @@ serve(async (req) => {
 
       const accountsData = await accountsResponse.json();
       const accounts = accountsData.accounts || [];
-      const institution = accountsData.item?.institution_id;
 
       // Save accounts to database
       const savedAccounts: Record<string, unknown>[] = [];
@@ -206,7 +237,7 @@ serve(async (req) => {
         const { data: accountData } = await supabase
           .from('user_bank_accounts')
           .insert({
-            user_id: user.id,
+            user_id: userId,
             plaid_access_token: exchangeData.access_token,
             plaid_account_id: account.account_id,
             plaid_item_id: exchangeData.item_id,
@@ -236,7 +267,7 @@ serve(async (req) => {
       const { data: accounts } = await supabase
         .from('user_bank_accounts')
         .select('id, bank_name, account_mask, account_type, is_verified, is_primary, created_at')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       return new Response(JSON.stringify({
@@ -260,7 +291,7 @@ serve(async (req) => {
         .from('user_bank_accounts')
         .select('*')
         .eq('id', account_id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (!account) {

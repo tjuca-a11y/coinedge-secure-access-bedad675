@@ -3,6 +3,7 @@ import { usePlaidLink as usePlaidLinkSDK, PlaidLinkOnSuccess, PlaidLinkOptions }
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { getAuthToken } from '@dynamic-labs/sdk-react-core';
 
 interface UsePlaidLinkResult {
   openPlaidLink: () => Promise<void>;
@@ -17,13 +18,38 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
+  // Helper to get the auth token from either Supabase or Dynamic
+  const getAuthTokenForApi = async (): Promise<string | null> => {
+    // First try Supabase auth
+    const { data: session } = await supabase.auth.getSession();
+    if (session.session?.access_token) {
+      return session.session.access_token;
+    }
+    
+    // Try Dynamic auth token
+    try {
+      const dynamicToken = getAuthToken();
+      if (dynamicToken) {
+        return dynamicToken;
+      }
+    } catch (e) {
+      // Dynamic SDK may not be initialized
+    }
+    
+    return null;
+  };
+
   // Handle successful link
   const handleSuccess: PlaidLinkOnSuccess = useCallback(async (publicToken, metadata) => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const token = await getAuthTokenForApi();
+      
+      if (!token) {
+        throw new Error('Please sign in to link a bank account');
+      }
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-link`,
@@ -31,7 +57,7 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.session?.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ 
             action: 'exchange_public_token',
@@ -79,26 +105,26 @@ export const usePlaidLink = (onSuccess?: () => void): UsePlaidLinkResult => {
     setError(null);
 
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const token = await getAuthTokenForApi();
       
-      if (!session.session?.access_token) {
+      if (!token) {
         throw new Error('Please sign in first');
       }
 
       // Get link token from edge function
-      const response = await fetch(
+      const linkResponse = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-link`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.session.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ action: 'create_link_token' }),
         }
       );
 
-      const data = await response.json();
+      const data = await linkResponse.json();
 
       if (data.mock) {
         // Plaid not configured - show message
