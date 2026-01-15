@@ -17,6 +17,7 @@ import {
   ArrowLeftRight,
   Settings,
   ChevronDown,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -77,6 +78,7 @@ const navSections: NavSection[] = [
     label: 'System',
     icon: Settings,
     items: [
+      { path: '/admin/health', label: 'System Health', icon: Activity },
       { path: '/admin/system-controls', label: 'System Controls', icon: Settings },
       { path: '/admin/audit-logs', label: 'Audit Logs', icon: FileText },
     ],
