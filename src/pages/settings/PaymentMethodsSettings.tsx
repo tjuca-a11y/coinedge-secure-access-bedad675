@@ -19,19 +19,14 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
+import { useUserBankAccounts, type UserBankAccount } from "@/hooks/useTreasury";
 
-interface BankAccount {
-  id: string;
-  bank_name: string;
-  account_mask: string;
-  account_type: string;
-  is_verified: boolean | null;
-  is_primary: boolean | null;
-  created_at: string;
-}
+type BankAccount = UserBankAccount;
+// BankAccount type comes from treasury hooks
+
 
 const PaymentMethodsSettings: React.FC = () => {
   const navigate = useNavigate();
@@ -51,21 +46,8 @@ const PaymentMethodsSettings: React.FC = () => {
   const profileId = isWalletAuth ? syncedProfile?.userId : profile?.user_id;
   const identityEmail = isWalletAuth ? (dynamicUser?.email || syncedProfile?.email) : user?.email;
 
-  const { data: bankAccounts = [], isLoading } = useQuery({
-    queryKey: ["bank-accounts", profileId],
-    queryFn: async () => {
-      if (!profileId) return [];
-      const { data, error } = await supabase
-        .from("user_bank_accounts_public")
-        .select("id, bank_name, account_mask, account_type, is_verified, is_primary, created_at, user_id")
-        .eq("user_id", profileId)
-        .order("is_primary", { ascending: false });
-
-      if (error) throw error;
-      return (data || []) as BankAccount[];
-    },
-    enabled: !!profileId,
-  });
+  const bankAccountsUserId = isWalletAuth ? undefined : profileId;
+  const { data: bankAccounts = [], isLoading } = useUserBankAccounts(bankAccountsUserId);
 
   const setPrimaryMutation = useMutation({
     mutationFn: async (accountId: string) => {

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getAuthToken } from '@dynamic-labs/sdk-react-core';
 
 // =====================================================
 // Treasury Hooks - BTC + USDC Inventory Management
@@ -171,52 +172,52 @@ export const useUserBankAccounts = (userId?: string) => {
   return useQuery({
     queryKey: ['user-bank-accounts', userId],
     queryFn: async () => {
-      // Determine effective user ID
-      let effectiveUserId = userId;
+      // If caller provided a userId, we can query the public view directly.
+      if (userId) {
+        const { data, error } = await supabase
+          .from('user_bank_accounts_public')
+          .select('id, bank_name, account_mask, account_type, is_verified, is_primary, created_at, user_id')
+          .eq('user_id', userId)
+          .order('is_primary', { ascending: false });
 
-      if (!effectiveUserId) {
-        // Try persisted Dynamic->backend user id (available even when Supabase session is not)
+        if (error) throw error;
+        return (data || []) as UserBankAccount[];
+      }
+
+      // Otherwise, fetch via the backend function so it works for BOTH:
+      // - email/password sessions
+      // - Dynamic wallet sessions (where there may be no Supabase session in the browser)
+      const { data: session } = await supabase.auth.getSession();
+      const supabaseAccessToken = session.session?.access_token;
+
+      let token = supabaseAccessToken || null;
+
+      if (!token) {
         try {
-          const raw = localStorage.getItem('dynamic_synced_profile');
-          const parsed = raw ? (JSON.parse(raw) as { userId?: string }) : null;
-          if (parsed?.userId) {
-            effectiveUserId = parsed.userId;
-          }
+          token = getAuthToken() || null;
         } catch {
-          // ignore
+          token = null;
         }
       }
 
-      if (!effectiveUserId) {
-        // Try Supabase session
-        const { data: { user } } = await supabase.auth.getUser();
+      if (!token) return [];
 
-        if (user?.id) {
-          // Map auth user id -> profile id (our app uses profile.id as the user_id foreign key)
-          const { data: profileRow } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/plaid-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'get_accounts' }),
+      });
 
-          effectiveUserId = profileRow?.id || user.id;
-        }
+      const json = await resp.json();
+
+      if (!resp.ok) {
+        throw new Error(json?.error || 'Failed to load bank accounts');
       }
 
-      if (!effectiveUserId) {
-        // No user ID available, return empty array
-        return [];
-      }
-
-      // Use the secure view that excludes sensitive columns like plaid_access_token
-      const { data, error } = await supabase
-        .from('user_bank_accounts_public')
-        .select('id, bank_name, account_mask, account_type, is_verified, is_primary, created_at, user_id')
-        .eq('user_id', effectiveUserId)
-        .order('is_primary', { ascending: false });
-
-      if (error) throw error;
-      return data as UserBankAccount[];
+      return (json?.accounts || []) as UserBankAccount[];
     },
   });
 };

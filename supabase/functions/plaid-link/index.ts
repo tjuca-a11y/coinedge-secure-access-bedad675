@@ -116,10 +116,10 @@ serve(async (req) => {
       }
       
       if (action === 'get_accounts') {
-        // Return accounts from database for development
+        // Return accounts from database for development (only safe/public fields)
         const { data: accounts } = await supabase
           .from('user_bank_accounts')
-          .select('*')
+          .select('id, bank_name, account_mask, account_type, is_verified, is_primary, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
         
