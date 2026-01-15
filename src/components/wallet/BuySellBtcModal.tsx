@@ -11,12 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowRight, ArrowUpRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wallet, Building2, Shield, Pen } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bitcoin, DollarSign, Loader2, AlertCircle, Wallet, Building2, Shield, Pen, Clock, Plus, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { useCoinEdgeTransfer } from "@/hooks/useCoinEdgeTransfer";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
+import { useUserBankAccounts, useCreateCashoutOrder, useRemoveBankAccount } from "@/hooks/useTreasury";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -40,6 +41,7 @@ interface BuySellBtcModalProps {
 }
 
 type PaymentMethod = "usdc_wallet" | "plaid_bank";
+type SellDestination = "usdc_wallet" | "bank_account";
 
 export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   open,
@@ -55,7 +57,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   // Plaid bank linking hook
   const { openPlaidLink, isLoading: isPlaidLoading } = usePlaidLink(() => {
     setIsPlaidConnected(true);
-    toast.success("Bank account connected! You can now buy BTC with your bank.");
+    toast.success("Bank account connected!");
   });
   
   // Check auth and KYC from either source
@@ -67,8 +69,23 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("usdc_wallet");
+  const [sellDestination, setSellDestination] = useState<SellDestination>("usdc_wallet");
   const [isPlaidConnected, setIsPlaidConnected] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
+
+  // Bank accounts for sell-to-bank flow
+  const { data: bankAccounts, isLoading: loadingAccounts, refetch: refetchAccounts } = useUserBankAccounts();
+  const createCashout = useCreateCashoutOrder();
+  const removeAccount = useRemoveBankAccount();
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+
+  // Auto-select primary bank account
+  useEffect(() => {
+    if (bankAccounts && bankAccounts.length > 0 && !selectedBankAccountId) {
+      const primary = bankAccounts.find((a) => a.is_primary) || bankAccounts[0];
+      setSelectedBankAccountId(primary.id);
+    }
+  }, [bankAccounts, selectedBankAccountId]);
 
   // Calculate conversion
   const usdAmount = parseFloat(amount) || 0;
@@ -78,13 +95,17 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
 
   // For sell: user enters USD they want to receive
   const btcToSell = usdAmount / currentBtcPrice;
-  const sellFee = usdAmount * 0.01;
+  // Different fees for different destinations
+  const sellFeeUsdc = usdAmount * 0.01; // 1% fee for USDC
+  const sellFeeBank = Math.max(1, usdAmount * 0.005); // 0.5% min $1 for bank
+  const sellFee = sellDestination === "usdc_wallet" ? sellFeeUsdc : sellFeeBank;
   const totalReceive = usdAmount - sellFee;
 
   // Reset amount when tab changes
   useEffect(() => {
     setAmount("");
     setPaymentMethod("usdc_wallet");
+    setSellDestination("usdc_wallet");
     setShowQuote(false);
     clearQuote();
   }, [activeTab, clearQuote]);
@@ -93,9 +114,29 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
     openPlaidLink();
   };
 
+  const handleConnectPlaidForSell = () => {
+    openPlaidLink();
+    refetchAccounts();
+  };
+
+  const handleRemoveBankAccount = async (accountId: string) => {
+    if (confirm("Remove this bank account?")) {
+      await removeAccount.mutateAsync(accountId);
+      if (selectedBankAccountId === accountId) {
+        setSelectedBankAccountId(null);
+      }
+    }
+  };
+
   const handleGetQuote = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       toast.error("Please enter a valid amount");
+      return;
+    }
+
+    // For bank destination, skip quote and use direct cashout
+    if (activeTab === "sell" && sellDestination === "bank_account") {
+      setShowQuote(true);
       return;
     }
 
@@ -128,6 +169,36 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
       return;
     }
 
+    if (activeTab === "sell" && btcToSell > btcBalance) {
+      toast.error("Insufficient BTC balance");
+      return;
+    }
+
+    // Handle sell-to-bank flow differently
+    if (activeTab === "sell" && sellDestination === "bank_account") {
+      if (!selectedBankAccountId) {
+        toast.error("Please select a bank account");
+        return;
+      }
+
+      try {
+        await createCashout.mutateAsync({
+          bank_account_id: selectedBankAccountId,
+          source_asset: "BTC",
+          source_amount: btcToSell,
+          usd_amount: usdAmount,
+        });
+        setAmount("");
+        setShowQuote(false);
+        onOpenChange(false);
+        toast.success("Sell order submitted! Funds will arrive in 1-3 business days.");
+      } catch (error) {
+        // Error handled by mutation
+      }
+      return;
+    }
+
+    // Normal USDC sell flow
     if (!quote) {
       toast.error("Please get a quote first");
       return;
@@ -136,11 +207,6 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
     // Validation
     if (activeTab === "buy" && paymentMethod === "usdc_wallet" && totalCost > usdcBalance) {
       toast.error("Insufficient USDC balance");
-      return;
-    }
-
-    if (activeTab === "sell" && btcToSell > btcBalance) {
-      toast.error("Insufficient BTC balance");
       return;
     }
 
@@ -166,7 +232,8 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
       const maxSpend = usdcBalance / 1.01; // Account for 1% fee
       setAmount((maxSpend * pct).toFixed(2));
     } else {
-      const maxReceive = btcBalance * currentBtcPrice * 0.99; // After 1% fee
+      const feeMultiplier = sellDestination === "usdc_wallet" ? 0.99 : 0.995;
+      const maxReceive = btcBalance * currentBtcPrice * feeMultiplier;
       setAmount((maxReceive * pct).toFixed(2));
     }
     setShowQuote(false);
@@ -409,6 +476,127 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
           </TabsContent>
 
           <TabsContent value="sell" className="space-y-4 mt-4">
+            {/* Sell Destination Selection */}
+            <div className="space-y-3">
+              <Label>Receive as</Label>
+              <RadioGroup
+                value={sellDestination}
+                onValueChange={(v) => {
+                  setSellDestination(v as SellDestination);
+                  setShowQuote(false);
+                }}
+                className="grid grid-cols-2 gap-3"
+              >
+                <Label
+                  htmlFor="sell_usdc_wallet"
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    sellDestination === "usdc_wallet"
+                      ? "border-usdc bg-usdc/5"
+                      : "border-border hover:border-usdc/50"
+                  }`}
+                >
+                  <RadioGroupItem value="usdc_wallet" id="sell_usdc_wallet" className="sr-only" />
+                  <Wallet className="h-5 w-5 text-usdc" />
+                  <span className="text-sm font-medium">USDC Wallet</span>
+                  <span className="text-xs text-muted-foreground">Instant</span>
+                </Label>
+                <Label
+                  htmlFor="sell_bank_account"
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    sellDestination === "bank_account"
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <RadioGroupItem value="bank_account" id="sell_bank_account" className="sr-only" />
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">Bank Account</span>
+                  <span className="text-xs text-muted-foreground">1-3 days</span>
+                </Label>
+              </RadioGroup>
+            </div>
+
+            {/* Bank Account Selection for sell-to-bank */}
+            {sellDestination === "bank_account" && (
+              <div className="space-y-3">
+                <Label>Destination Bank Account</Label>
+                {loadingAccounts ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : bankAccounts && bankAccounts.length > 0 ? (
+                  <div className="space-y-2">
+                    {bankAccounts.map((account) => (
+                      <Card
+                        key={account.id}
+                        className={`p-3 flex items-center gap-3 cursor-pointer transition-all ${
+                          selectedBankAccountId === account.id
+                            ? "border-primary bg-primary/5"
+                            : "hover:border-primary/50"
+                        }`}
+                        onClick={() => setSelectedBankAccountId(account.id)}
+                      >
+                        <Building2 className="h-5 w-5 text-primary" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{account.bank_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ****{account.account_mask} • {account.account_type}
+                          </p>
+                        </div>
+                        {account.is_verified && (
+                          <Check className="h-4 w-4 text-success" />
+                        )}
+                        {selectedBankAccountId === account.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveBankAccount(account.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </Card>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleConnectPlaidForSell}
+                      disabled={isPlaidLoading}
+                      className="w-full gap-2"
+                    >
+                      {isPlaidLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                      Add Another Account
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={handleConnectPlaidForSell}
+                    disabled={isPlaidLoading}
+                    className="w-full gap-2 h-auto py-4"
+                  >
+                    {isPlaidLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Building2 className="h-5 w-5" />
+                    )}
+                    <div className="text-left">
+                      <p className="font-medium">Connect Bank Account</p>
+                      <p className="text-xs text-muted-foreground">Via Plaid - secure bank linking</p>
+                    </div>
+                  </Button>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label>Amount to receive (USD)</Label>
@@ -457,19 +645,36 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
                 <span>${currentBtcPrice.toLocaleString()}/BTC</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Fee (1%)</span>
+                <span className="text-muted-foreground">
+                  Fee ({sellDestination === "usdc_wallet" ? "1%" : "0.5%"})
+                </span>
                 <span>-${sellFee.toFixed(2)}</span>
               </div>
               <div className="border-t pt-2 flex justify-between font-medium">
                 <span>You'll receive</span>
-                <span>${totalReceive.toFixed(2)} USDC</span>
+                <span>
+                  ${totalReceive.toFixed(2)} {sellDestination === "usdc_wallet" ? "USDC" : "USD"}
+                </span>
               </div>
+              {sellDestination === "bank_account" && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>Arrives in 1-3 business days</span>
+                </div>
+              )}
             </Card>
 
             {btcToSell > btcBalance && amount && (
               <div className="flex items-center gap-2 text-destructive text-sm">
                 <AlertCircle className="h-4 w-4" />
                 Insufficient BTC balance
+              </div>
+            )}
+
+            {sellDestination === "bank_account" && !selectedBankAccountId && bankAccounts && bankAccounts.length > 0 && amount && (
+              <div className="flex items-center gap-2 text-amber-600 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                Please select a bank account
               </div>
             )}
 
@@ -481,17 +686,25 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
 
             <Button
               onClick={showQuote ? handleSubmit : handleGetQuote}
-              disabled={isLoading || !amount || isWalletInitializing || btcToSell > btcBalance}
+              disabled={
+                (isLoading || createCashout.isPending) || 
+                !amount || 
+                isWalletInitializing || 
+                btcToSell > btcBalance ||
+                (sellDestination === "bank_account" && !selectedBankAccountId)
+              }
               className="w-full"
               variant="destructive"
             >
-              {isLoading ? (
+              {(isLoading || createCashout.isPending) ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
                 </>
               ) : showQuote ? (
-                `Sell ${btcToSell.toFixed(8)} BTC`
+                sellDestination === "usdc_wallet" 
+                  ? `Sell ${btcToSell.toFixed(8)} BTC` 
+                  : `Sell for $${totalReceive.toFixed(2)} to Bank`
               ) : (
                 "Get Quote"
               )}
