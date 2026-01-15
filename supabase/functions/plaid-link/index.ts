@@ -231,27 +231,30 @@ serve(async (req) => {
       const accountsData = await accountsResponse.json();
       const accounts = accountsData.accounts || [];
 
-      // Upsert accounts to database (prevent duplicates on re-link)
+      // Upsert accounts to database (match on account fingerprint, not Plaid IDs)
       const savedAccounts: Record<string, unknown>[] = [];
       for (const account of accounts) {
-        // Check if account already exists
+        const accountMask = account.mask || '****';
+        const accountType = account.subtype === 'savings' ? 'savings' : 'checking';
+        
+        // Check if account already exists by fingerprint (mask + type)
         const { data: existing } = await supabase
           .from('user_bank_accounts')
           .select('id, is_primary')
           .eq('user_id', userId)
-          .eq('plaid_item_id', exchangeData.item_id)
-          .eq('plaid_account_id', account.account_id)
+          .eq('account_mask', accountMask)
+          .eq('account_type', accountType)
           .maybeSingle();
 
         if (existing) {
-          // Update existing account
+          // Update existing account with new Plaid credentials
           const { data: accountData } = await supabase
             .from('user_bank_accounts')
             .update({
               plaid_access_token: exchangeData.access_token,
+              plaid_account_id: account.account_id,
+              plaid_item_id: exchangeData.item_id,
               bank_name: account.name || 'Bank Account',
-              account_mask: account.mask || '****',
-              account_type: account.subtype === 'savings' ? 'savings' : 'checking',
               is_verified: true,
               updated_at: new Date().toISOString(),
             })
@@ -271,8 +274,8 @@ serve(async (req) => {
               plaid_account_id: account.account_id,
               plaid_item_id: exchangeData.item_id,
               bank_name: account.name || 'Bank Account',
-              account_mask: account.mask || '****',
-              account_type: account.subtype === 'savings' ? 'savings' : 'checking',
+              account_mask: accountMask,
+              account_type: accountType,
               is_verified: true,
               is_primary: savedAccounts.length === 0, // First account is primary
             })
