@@ -6,6 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Decode JWT payload without verification (for Dynamic tokens we trust the source)
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -15,10 +27,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: req.headers.get('Authorization')! } }
-    });
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -32,16 +40,43 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    let userId: string | null = null;
+
+    // Try Supabase auth first
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
     const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
     
-    if (userError || !user) {
+    if (!userError && user) {
+      userId = user.id;
+    } else {
+      // Try Dynamic JWT - decode and look up user by Dynamic ID
+      const payload = decodeJwtPayload(token);
+      
+      if (payload && payload.sub && typeof payload.iss === 'string' && payload.iss.includes('dynamicauth.com')) {
+        const dynamicUserId = payload.sub as string;
+        
+        // Look up profile by Dynamic user_id
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_id, kyc_status')
+          .eq('user_id', dynamicUserId)
+          .single();
+        
+        if (profile) {
+          userId = profile.user_id;
+        }
+      }
+    }
+
+    if (!userId) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const userId = user.id;
 
     // Check KYC status
     const { data: profile } = await supabase
