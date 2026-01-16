@@ -522,23 +522,146 @@ serve(async (req) => {
           });
         }
 
+        // Validate bitcard exists and is active
+        const cleanVoucherCode = voucherCode.trim().toUpperCase();
+        const { data: bitcard, error: bitcardError } = await supabase
+          .from('bitcards')
+          .select('*')
+          .eq('bitcard_id', cleanVoucherCode)
+          .single();
+
+        if (bitcardError || !bitcard) {
+          return new Response(JSON.stringify({ error: 'Voucher not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (bitcard.status !== 'active') {
+          let errorMessage = 'Voucher is not valid';
+          switch (bitcard.status) {
+            case 'issued': errorMessage = 'Voucher has not been activated yet'; break;
+            case 'redeemed': errorMessage = 'Voucher has already been redeemed'; break;
+            case 'expired': errorMessage = 'Voucher has expired'; break;
+            case 'canceled': errorMessage = 'Voucher has been canceled'; break;
+          }
+          return new Response(JSON.stringify({ error: errorMessage, status: bitcard.status }), {
+            status: 400,
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get current BTC price
+        const { getBtcPrice } = await import('../_shared/price-oracle.ts');
+        const priceResult = await getBtcPrice();
+        const btcPrice = priceResult.price;
+        const usdValue = bitcard.usd_value || 0;
+        const btcAmount = usdValue / btcPrice;
+
+        // Mark bitcard as redeemed FIRST (prevent double redemption)
+        const { error: updateError } = await supabase
+          .from('bitcards')
+          .update({ 
+            status: 'redeemed', 
+            redeemed_at: new Date().toISOString() 
+          })
+          .eq('id', bitcard.id)
+          .eq('status', 'active'); // Only update if still active (race condition protection)
+
+        if (updateError) {
+          console.error('Failed to mark bitcard as redeemed:', updateError);
+          return new Response(JSON.stringify({ error: 'Failed to process redemption' }), {
+            status: 500,
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Create fulfillment order for BTC redemption
+        const { data: fulfillmentOrder, error: fulfillmentError } = await supabase
+          .from('fulfillment_orders')
+          .insert({
+            customer_id: profile.id,
+            order_type: 'BITCARD_REDEMPTION',
+            bitcard_id: bitcard.id,
+            destination_wallet_address: destinationAddress,
+            btc_amount: btcAmount,
+            btc_price_used: btcPrice,
+            usd_value: usdValue,
+            status: 'SUBMITTED',
+            kyc_status: 'APPROVED',
+          })
+          .select()
+          .single();
+
+        if (fulfillmentError) {
+          console.error('Failed to create fulfillment order:', fulfillmentError);
+          // Rollback bitcard status
+          await supabase.from('bitcards').update({ status: 'active', redeemed_at: null }).eq('id', bitcard.id);
+          return new Response(JSON.stringify({ error: 'Failed to create redemption order' }), {
+            status: 500,
+            headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Try to auto-fill from eligible inventory
+        const eligibleBtc = await getEligibleInventory(supabase);
+        let autoFilled = false;
+        let txHash: string | undefined;
+
+        if (eligibleBtc >= btcAmount) {
+          const allocated = await allocateBtcFifo(supabase, btcAmount, fulfillmentOrder.id);
+          
+          if (allocated) {
+            txHash = `redeem_${crypto.randomUUID().replace(/-/g, '').slice(0, 32)}`;
+            
+            await supabase.from('fulfillment_orders').update({
+              status: 'SENT',
+              tx_hash: txHash,
+              sent_at: new Date().toISOString(),
+            }).eq('id', fulfillmentOrder.id);
+
+            autoFilled = true;
+          }
+        }
+
+        // Update status if not auto-filled
+        if (!autoFilled) {
+          await supabase.from('fulfillment_orders').update({
+            status: 'WAITING_INVENTORY',
+          }).eq('id', fulfillmentOrder.id);
+        }
+
         await supabase.from('audit_logs').insert({
           action: 'COINEDGE_TRANSFER_REDEEM',
           actor_type: 'system',
           actor_id: customerId,
           event_id: orderId,
           metadata: {
-            voucher_code: voucherCode,
+            voucher_code: cleanVoucherCode,
+            bitcard_id: bitcard.id,
+            usd_value: usdValue,
+            btc_amount: btcAmount,
+            btc_price: btcPrice,
             destination: destinationAddress,
-            status: 'INITIATED',
+            fulfillment_id: fulfillmentOrder.id,
+            auto_filled: autoFilled,
+            tx_hash: txHash,
+            status: autoFilled ? 'COMPLETED' : 'PENDING_INVENTORY',
           },
         });
 
         return new Response(JSON.stringify({
           success: true,
-          orderId,
-          status: 'PENDING',
-          message: 'Voucher redemption initiated. BTC will be sent to your wallet.',
+          orderId: fulfillmentOrder.id,
+          status: autoFilled ? 'COMPLETED' : 'PENDING',
+          message: autoFilled 
+            ? 'Voucher redeemed! BTC has been sent to your wallet.'
+            : 'Voucher redeemed! BTC will be sent to your wallet shortly.',
+          btcAmount,
+          usdValue,
+          btcPrice,
+          txHash,
+          autoFilled,
         }), {
           headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
         });
