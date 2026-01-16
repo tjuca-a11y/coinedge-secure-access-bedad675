@@ -22,8 +22,8 @@ interface VoucherResult {
 }
 
 const Redeem = () => {
-  const { profile, isKycApproved } = useAuth();
-  const { btcWallet, ethWallet, isConnected, isWalletInitializing } = useDynamicWallet();
+  const { profile: supabaseProfile, isKycApproved: supabaseKycApproved } = useAuth();
+  const { btcWallet, ethWallet, isConnected, isWalletInitializing, syncedProfile, isAuthenticated: isDynamicAuthenticated } = useDynamicWallet();
   const { validateVoucher, getQuote, executeTransfer, isLoading } = useCoinEdgeTransfer();
 
   const [voucherCode, setVoucherCode] = useState("");
@@ -34,6 +34,14 @@ const Redeem = () => {
   const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerRef = useRef<HTMLDivElement>(null);
+
+  // Use centralized KYC status - Dynamic users check syncedProfile, Supabase users check isKycApproved
+  const isKycApproved = isDynamicAuthenticated
+    ? syncedProfile?.kycStatus === 'approved'
+    : supabaseKycApproved;
+  
+  // Use profile for wallet addresses  
+  const profile = isDynamicAuthenticated ? null : supabaseProfile;
 
   // Redirect if KYC not approved
   if (!isKycApproved) {
