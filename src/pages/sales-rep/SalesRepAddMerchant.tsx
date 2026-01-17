@@ -104,6 +104,7 @@ const SalesRepAddMerchant: React.FC = () => {
           city: formData.city || null,
           state: formData.state || null,
           zip: formData.zip || null,
+          category: formData.category || null,
           rep_id: salesRep.id,
           status: 'lead',
         })
