@@ -73,7 +73,7 @@ interface Transaction {
   icon: React.ElementType;
   iconBg: string;
   iconColor: string;
-  type: "buy_btc" | "sell_btc" | "cashout" | "received" | "sent";
+  type: "buy_btc" | "sell_btc" | "cashout" | "redemption" | "received" | "sent";
   status: "completed" | "pending" | "processing" | "failed" | "cancelled";
   txHash?: string;
   fee?: string;
@@ -88,8 +88,56 @@ interface Transaction {
   rawDate: Date;
 }
 
-type TransactionType = "all" | "buy_btc" | "sell_btc" | "cashout";
+type TransactionType = "all" | "buy_btc" | "sell_btc" | "cashout" | "redemption";
 type SortOption = "newest" | "oldest" | "highest" | "lowest";
+
+interface FulfillmentOrder {
+  id: string;
+  order_type: string;
+  status: string;
+  usd_value: number;
+  btc_amount: number | null;
+  btc_price_used: number | null;
+  destination_wallet_address: string;
+  tx_hash: string | null;
+  created_at: string;
+  sent_at: string | null;
+  blocked_reason: string | null;
+}
+
+const mapRedemptionToTransaction = (order: FulfillmentOrder): Transaction => {
+  const statusMap: Record<string, Transaction["status"]> = {
+    "SUBMITTED": "pending",
+    "KYC_PENDING": "pending",
+    "WAITING_INVENTORY": "pending",
+    "READY_TO_SEND": "processing",
+    "SENDING": "processing",
+    "SENT": "completed",
+    "FAILED": "failed",
+    "HOLD": "pending",
+  };
+
+  return {
+    id: order.id,
+    title: "Bitcard Redemption",
+    description: `Redeemed $${order.usd_value.toFixed(2)} Bitcard for BTC`,
+    date: format(new Date(order.created_at), "MMM d 'at' h:mm a"),
+    rawDate: new Date(order.created_at),
+    amount: order.btc_amount ? `+${order.btc_amount.toFixed(8)} BTC` : `+$${order.usd_value.toFixed(2)}`,
+    amountColor: "text-success",
+    icon: ArrowDownLeft,
+    iconBg: "bg-purple-100",
+    iconColor: "text-purple-600",
+    type: "redemption",
+    status: statusMap[order.status] || "pending",
+    txHash: order.tx_hash || undefined,
+    usdValue: `$${order.usd_value.toFixed(2)}`,
+    btcAmount: order.btc_amount || undefined,
+    btcPrice: order.btc_price_used || undefined,
+    destinationAddress: order.destination_wallet_address,
+    failedReason: order.blocked_reason || undefined,
+  };
+};
 
 const mapSwapOrderToTransaction = (order: SwapOrder): Transaction => {
   const isBuy = order.order_type === "BUY_BTC";
@@ -171,7 +219,35 @@ const Activity: React.FC = () => {
     user ? { userId: user.id } : undefined
   );
 
-  const isLoading = swapLoading || cashoutLoading;
+  // Query for redemption (fulfillment) orders
+  const [redemptionOrders, setRedemptionOrders] = useState<FulfillmentOrder[]>([]);
+  const [redemptionLoading, setRedemptionLoading] = useState(false);
+  
+  const fetchRedemptionOrders = useCallback(async () => {
+    if (!user?.id) return;
+    setRedemptionLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('fulfillment_orders')
+        .select('*')
+        .eq('customer_id', user.id)
+        .eq('order_type', 'BITCARD_REDEMPTION')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setRedemptionOrders(data || []);
+    } catch (err) {
+      console.error('Error fetching redemption orders:', err);
+    } finally {
+      setRedemptionLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchRedemptionOrders();
+  }, [fetchRedemptionOrders]);
+
+  const isLoading = swapLoading || cashoutLoading || redemptionLoading;
   const btcValue = btcBalance * currentBtcPrice;
 
   // Real-time subscription for user's swap orders
@@ -209,16 +285,17 @@ const Activity: React.FC = () => {
     };
   }, [user?.id, queryClient]);
 
-  // Combine swap orders and cashout orders into transactions
+  // Combine swap orders, cashout orders, and redemption orders into transactions
   const swapTransactions: Transaction[] = swapOrders.map(mapSwapOrderToTransaction);
   const cashoutTransactions: Transaction[] = (cashoutOrders || []).map(mapCashoutToTransaction);
-  const transactions: Transaction[] = [...swapTransactions, ...cashoutTransactions]
+  const redemptionTransactions: Transaction[] = redemptionOrders.map(mapRedemptionToTransaction);
+  const transactions: Transaction[] = [...swapTransactions, ...cashoutTransactions, ...redemptionTransactions]
     .sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([refetchSwap(), refetchCashout()]);
+    await Promise.all([refetchSwap(), refetchCashout(), fetchRedemptionOrders()]);
     toast.success("Activity refreshed");
-  }, [refetchSwap, refetchCashout]);
+  }, [refetchSwap, refetchCashout, fetchRedemptionOrders]);
 
   const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -235,6 +312,7 @@ const Activity: React.FC = () => {
     if (typeFilter === "buy_btc") return matchesSearch && tx.type === "buy_btc";
     if (typeFilter === "sell_btc") return matchesSearch && tx.type === "sell_btc";
     if (typeFilter === "cashout") return matchesSearch && tx.type === "cashout";
+    if (typeFilter === "redemption") return matchesSearch && tx.type === "redemption";
     return matchesSearch;
   });
 
@@ -300,6 +378,7 @@ const Activity: React.FC = () => {
       case "buy_btc": return "Buy BTC";
       case "sell_btc": return "Sell BTC";
       case "cashout": return "Cash Out";
+      case "redemption": return "Redemptions";
       default: return "Filter";
     }
   };
@@ -494,6 +573,14 @@ const Activity: React.FC = () => {
                   onCheckedChange={() => setTypeFilter("cashout")}
                 >
                   Cash Out
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Bitcards</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "redemption"}
+                  onCheckedChange={() => setTypeFilter("redemption")}
+                >
+                  Redemptions
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
