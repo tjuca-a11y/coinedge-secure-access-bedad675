@@ -4,19 +4,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
 import { 
   Search, 
   Filter, 
   ArrowUpDown, 
   Download, 
-  Gift, 
-  Wallet, 
   ArrowUpRight, 
   ArrowDownLeft,
-  DollarSign,
   Bitcoin,
   TrendingDown,
-  AlertCircle,
+  TrendingUp,
   Check,
   FileText,
   FileSpreadsheet,
@@ -25,13 +23,15 @@ import {
   ExternalLink,
   ShoppingCart,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Building2
 } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/PullToRefresh";
 import { useSwapOrders, SwapOrder } from "@/hooks/useSwapOrders";
+import { useCashoutOrders } from "@/hooks/useTreasury";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -59,11 +59,8 @@ const btcPriceData = [
   { date: "Jan", price: 93327 },
 ];
 
-// Mock current values
+// Current BTC price
 const currentBtcPrice = 93327.91;
-const mockUsdcBalance = 2450.00;
-const mockBtcBalance = 0.464;
-const mockBtcValue = mockBtcBalance * currentBtcPrice;
 
 interface Transaction {
   id: string;
@@ -76,7 +73,7 @@ interface Transaction {
   icon: React.ElementType;
   iconBg: string;
   iconColor: string;
-  type: "buy_btc" | "sell_btc" | "buy_usdc" | "sell_usdc" | "received" | "sent" | "loan" | "interest" | "gift";
+  type: "buy_btc" | "sell_btc" | "cashout" | "received" | "sent";
   status: "completed" | "pending" | "processing" | "failed" | "cancelled";
   txHash?: string;
   fee?: string;
@@ -88,9 +85,10 @@ interface Transaction {
   btcPrice?: number;
   destinationAddress?: string;
   failedReason?: string;
+  rawDate: Date;
 }
 
-type TransactionType = "all" | "received" | "sent" | "loans" | "interest" | "buy_btc" | "sell_btc" | "buy_usdc" | "sell_usdc";
+type TransactionType = "all" | "buy_btc" | "sell_btc" | "cashout";
 type SortOption = "newest" | "oldest" | "highest" | "lowest";
 
 const mapSwapOrderToTransaction = (order: SwapOrder): Transaction => {
@@ -104,6 +102,7 @@ const mapSwapOrderToTransaction = (order: SwapOrder): Transaction => {
       ? `Purchased ${order.btc_amount.toFixed(8)} BTC with USDC`
       : `Sold ${order.btc_amount.toFixed(8)} BTC for USDC`,
     date: format(new Date(order.created_at), "MMM d 'at' h:mm a"),
+    rawDate: new Date(order.created_at),
     amount: isBuy ? `+${order.btc_amount.toFixed(8)} BTC` : `-${order.btc_amount.toFixed(8)} BTC`,
     amountColor: isBuy ? "text-success" : "text-foreground",
     icon: isBuy ? ShoppingCart : ArrowUpRight,
@@ -122,8 +121,44 @@ const mapSwapOrderToTransaction = (order: SwapOrder): Transaction => {
   };
 };
 
+interface CashoutOrder {
+  id: string;
+  order_id: string;
+  status: string;
+  source_asset: string;
+  source_amount: number;
+  usd_amount: number;
+  fee_usd: number;
+  created_at: string;
+  completed_at: string | null;
+  failed_reason: string | null;
+}
+
+const mapCashoutToTransaction = (order: CashoutOrder): Transaction => {
+  return {
+    id: order.id,
+    order_id: order.order_id,
+    title: "Cash Out",
+    description: `Withdrew $${order.usd_amount.toFixed(2)} to bank account`,
+    date: format(new Date(order.created_at), "MMM d 'at' h:mm a"),
+    rawDate: new Date(order.created_at),
+    amount: `-$${order.usd_amount.toFixed(2)}`,
+    amountColor: "text-foreground",
+    icon: Building2,
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+    type: "cashout",
+    status: order.status.toLowerCase() as Transaction["status"],
+    fee: `$${order.fee_usd.toFixed(2)}`,
+    usdValue: `$${order.usd_amount.toFixed(2)}`,
+    usdcAmount: order.source_amount,
+    failedReason: order.failed_reason || undefined,
+  };
+};
+
 const Activity: React.FC = () => {
   const { isKycApproved, user } = useAuth();
+  const { btcBalance, usdcBalance } = useDynamicWallet();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TransactionType>("all");
@@ -131,7 +166,13 @@ const Activity: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
-  const { data: swapOrders = [], isLoading, refetch } = useSwapOrders();
+  const { data: swapOrders = [], isLoading: swapLoading, refetch: refetchSwap } = useSwapOrders();
+  const { data: cashoutOrders = [], isLoading: cashoutLoading, refetch: refetchCashout } = useCashoutOrders(
+    user ? { userId: user.id } : undefined
+  );
+
+  const isLoading = swapLoading || cashoutLoading;
+  const btcValue = btcBalance * currentBtcPrice;
 
   // Real-time subscription for user's swap orders
   useEffect(() => {
@@ -168,13 +209,16 @@ const Activity: React.FC = () => {
     };
   }, [user?.id, queryClient]);
 
-  // Map swap orders to transactions
-  const transactions: Transaction[] = swapOrders.map(mapSwapOrderToTransaction);
+  // Combine swap orders and cashout orders into transactions
+  const swapTransactions: Transaction[] = swapOrders.map(mapSwapOrderToTransaction);
+  const cashoutTransactions: Transaction[] = (cashoutOrders || []).map(mapCashoutToTransaction);
+  const transactions: Transaction[] = [...swapTransactions, ...cashoutTransactions]
+    .sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
 
   const handleRefresh = useCallback(async () => {
-    await refetch();
+    await Promise.all([refetchSwap(), refetchCashout()]);
     toast.success("Activity refreshed");
-  }, [refetch]);
+  }, [refetchSwap, refetchCashout]);
 
   const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -190,6 +234,7 @@ const Activity: React.FC = () => {
     if (typeFilter === "all") return matchesSearch;
     if (typeFilter === "buy_btc") return matchesSearch && tx.type === "buy_btc";
     if (typeFilter === "sell_btc") return matchesSearch && tx.type === "sell_btc";
+    if (typeFilter === "cashout") return matchesSearch && tx.type === "cashout";
     return matchesSearch;
   });
 
@@ -254,6 +299,7 @@ const Activity: React.FC = () => {
     switch (typeFilter) {
       case "buy_btc": return "Buy BTC";
       case "sell_btc": return "Sell BTC";
+      case "cashout": return "Cash Out";
       default: return "Filter";
     }
   };
@@ -324,7 +370,7 @@ const Activity: React.FC = () => {
                 <div className="h-2 w-2 rounded-full bg-usdc" />
                 USDC
               </div>
-              <p className="text-lg md:text-2xl font-bold">${mockUsdcBalance.toLocaleString()}</p>
+              <p className="text-lg md:text-2xl font-bold">${usdcBalance.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground">Stablecoin</p>
             </CardContent>
           </Card>
@@ -334,7 +380,7 @@ const Activity: React.FC = () => {
                 <Bitcoin className="h-3 w-3 text-btc" />
                 Bitcoin
               </div>
-              <p className="text-lg md:text-2xl font-bold">${mockBtcValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+              <p className="text-lg md:text-2xl font-bold">${btcValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
               <p className="text-xs text-success flex items-center gap-1">
                 <ArrowUpRight className="h-3 w-3" />
                 +2.05% today
@@ -392,24 +438,6 @@ const Activity: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Alert Banner */}
-        <Card className="mb-4 md:mb-6 bg-amber-50 border-amber-200">
-          <CardContent className="p-3 md:p-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 rounded-full">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-              </div>
-              <div>
-                <p className="font-medium text-sm text-amber-900">New device login</p>
-                <p className="text-xs text-amber-700">Verification needed</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" className="shrink-0 border-amber-300 text-amber-900 hover:bg-amber-100">
-              Review
-            </Button>
-          </CardContent>
-        </Card>
-
         {/* Search and Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-2 md:gap-3 mb-4">
           <div className="relative flex-1">
@@ -458,6 +486,14 @@ const Activity: React.FC = () => {
                   onCheckedChange={() => setTypeFilter("sell_btc")}
                 >
                   Sell BTC
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Banking</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem 
+                  checked={typeFilter === "cashout"}
+                  onCheckedChange={() => setTypeFilter("cashout")}
+                >
+                  Cash Out
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
