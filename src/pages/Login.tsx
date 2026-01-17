@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Shield, LogIn, Loader2, Wallet, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import AuthLayout from '@/components/auth/AuthLayout';
 
 const Login: React.FC = () => {
   const { user, loading } = useAuth();
@@ -30,8 +29,8 @@ const Login: React.FC = () => {
     // Show wallet initialization loading state
     if (isWalletInitializing) {
       return (
-        <AuthLayout>
-          <Card className="border-0 shadow-lg">
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <Card className="w-full max-w-md">
             <CardContent className="py-12">
               <div className="text-center">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-6">
@@ -45,7 +44,7 @@ const Login: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        </AuthLayout>
+        </div>
       );
     }
 
@@ -64,8 +63,8 @@ const Login: React.FC = () => {
   // Dynamic must be configured for auth to work
   if (!isConfigured) {
     return (
-      <AuthLayout>
-        <Card className="border-0 shadow-lg">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-2">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
               <AlertTriangle className="h-8 w-8 text-destructive" />
@@ -76,23 +75,23 @@ const Login: React.FC = () => {
             </CardDescription>
           </CardHeader>
         </Card>
-      </AuthLayout>
+      </div>
     );
   }
 
   return (
-    <AuthLayout>
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="text-center space-y-2 pb-2">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center space-y-2">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <LogIn className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-bold">Sign in to CoinEdge</CardTitle>
           <CardDescription>
-            Sign in to access your CoinEdge wallet
+            Access your account and wallet
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 pt-4">
+        <CardContent className="space-y-6">
           {/* Dynamic Email Sign In - Single Widget */}
           <div className="space-y-4">
             <DynamicWidget
@@ -121,7 +120,7 @@ const Login: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </AuthLayout>
+    </div>
   );
 };
 
