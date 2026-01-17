@@ -7,6 +7,7 @@ import { DynamicWidget } from '@dynamic-labs/sdk-react-core';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { UserPlus, Shield, AlertTriangle } from 'lucide-react';
+import AuthLayout from '@/components/auth/AuthLayout';
 
 const SignUp: React.FC = () => {
   const { user, loading } = useAuth();
@@ -29,8 +30,8 @@ const SignUp: React.FC = () => {
   // Dynamic must be configured for auth to work
   if (!isConfigured) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
+      <AuthLayout>
+        <Card className="border-0 shadow-lg">
           <CardHeader className="text-center space-y-2">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
               <AlertTriangle className="h-8 w-8 text-destructive" />
@@ -41,23 +42,23 @@ const SignUp: React.FC = () => {
             </CardDescription>
           </CardHeader>
         </Card>
-      </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
+    <AuthLayout>
+      <Card className="border-0 shadow-lg">
+        <CardHeader className="text-center space-y-2 pb-2">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <UserPlus className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Create Your CoinEdge Account</CardTitle>
+          <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
           <CardDescription>
-            Buy, sell, and hold Bitcoin & USDC
+            Start your crypto journey with CoinEdge
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-4">
           {/* Dynamic Email Sign Up - Single Widget */}
           <div className="space-y-4">
             <DynamicWidget
@@ -86,7 +87,7 @@ const SignUp: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </AuthLayout>
   );
 };
 
