@@ -17,7 +17,7 @@ import { CashOutModal } from "@/components/wallet/CashOutModal";
 import { CashOutHistory } from "@/components/wallet/CashOutHistory";
 import { ReceiveModal } from "@/components/wallet/ReceiveModal";
 import { BankAccountsCard } from "@/components/wallet/BankAccountsCard";
-import { BtcDetailView } from "@/components/wallet/BtcDetailView";
+import { BtcDetailModal } from "@/components/wallet/BtcDetailModal";
 import { Badge } from "@/components/ui/badge";
 
 // Mock account performance data with more realistic values for demo
@@ -127,30 +127,6 @@ const Wallet: React.FC = () => {
           </Card>
         </div>
       </DashboardLayout>
-    );
-  }
-
-  // Show BTC Detail View
-  if (showBtcDetail && isKycApproved) {
-    return (
-      <>
-        <BtcDetailView
-          btcBalance={btcBalance}
-          btcPrice={currentBtcPrice}
-          totalPortfolioValue={totalBalance}
-          onBack={() => setShowBtcDetail(false)}
-          onBuy={() => setBuySellModalOpen(true)}
-          onSell={() => setBuySellModalOpen(true)}
-        />
-        {/* Buy/Sell BTC Modal - needs to be rendered here too */}
-        <BuySellBtcModal
-          open={buySellModalOpen}
-          onOpenChange={setBuySellModalOpen}
-          currentBtcPrice={currentBtcPrice}
-          btcBalance={btcBalance}
-          usdcBalance={usdcBalance}
-        />
-      </>
     );
   }
 
@@ -442,6 +418,23 @@ const Wallet: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* BTC Detail Modal */}
+        <BtcDetailModal
+          open={showBtcDetail}
+          onOpenChange={setShowBtcDetail}
+          btcBalance={btcBalance}
+          btcPrice={currentBtcPrice}
+          totalPortfolioValue={totalBalance}
+          onBuy={() => {
+            setShowBtcDetail(false);
+            setBuySellModalOpen(true);
+          }}
+          onSell={() => {
+            setShowBtcDetail(false);
+            setBuySellModalOpen(true);
+          }}
+        />
 
         {/* Buy/Sell BTC Modal */}
         <BuySellBtcModal
