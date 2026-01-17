@@ -60,7 +60,21 @@ const AdminMerchants: React.FC = () => {
     state: '',
     zip: '',
     rep_id: '',
+    category: '',
   });
+
+  const categories = [
+    'Coffee Shop',
+    'Restaurant',
+    'Grocery Store',
+    'Convenience Store',
+    'Pizza Shop',
+    'Bar/Nightclub',
+    'Retail Store',
+    'Gas Station',
+    'Food Truck',
+    'Other',
+  ];
 
   const handleCreateMerchant = async () => {
     if (!formData.business_name || !formData.point_of_contact || !formData.phone || !formData.email) {
@@ -88,6 +102,7 @@ const AdminMerchants: React.FC = () => {
         state: formData.state || null,
         zip: formData.zip || null,
         rep_id: formData.rep_id || null,
+        category: formData.category || null,
         status: 'lead',
       });
 
@@ -117,6 +132,7 @@ const AdminMerchants: React.FC = () => {
         state: '',
         zip: '',
         rep_id: '',
+        category: '',
       });
       queryClient.invalidateQueries({ queryKey: ['admin-merchants'] });
     } catch (error: any) {
@@ -130,7 +146,7 @@ const AdminMerchants: React.FC = () => {
     }
   };
 
-  const updateMerchantStatus = async (merchantId: string, newStatus: 'lead' | 'invited' | 'onboarding_started' | 'kyc_pending' | 'approved' | 'active' | 'paused') => {
+  const updateMerchantStatus = async (merchantId: string, newStatus: 'lead' | 'invited' | 'onboarding_started' | 'approved' | 'active' | 'paused') => {
     try {
       const { error } = await supabase
         .from('merchants')
@@ -170,8 +186,6 @@ const AdminMerchants: React.FC = () => {
         return 'default';
       case 'paused':
         return 'destructive';
-      case 'kyc_pending':
-        return 'secondary';
       default:
         return 'outline';
     }
@@ -212,14 +226,34 @@ const AdminMerchants: React.FC = () => {
                   <DialogDescription>Create a new merchant record.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="business_name">Business Name *</Label>
-                    <Input
-                      id="business_name"
-                      value={formData.business_name}
-                      onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
-                      placeholder="Acme Corp"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="business_name">Business Name *</Label>
+                      <Input
+                        id="business_name"
+                        value={formData.business_name}
+                        onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
+                        placeholder="Acme Corp"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
@@ -389,14 +423,6 @@ const AdminMerchants: React.FC = () => {
                             <UserPlus className="mr-2 h-4 w-4" />
                             Reassign Rep
                           </DropdownMenuItem>
-                          {merchant.status === 'kyc_pending' && (
-                            <DropdownMenuItem
-                              onClick={() => updateMerchantStatus(merchant.id, 'approved')}
-                            >
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Approve KYC
-                            </DropdownMenuItem>
-                          )}
                           {merchant.status === 'approved' && (
                             <DropdownMenuItem
                               onClick={() => updateMerchantStatus(merchant.id, 'active')}

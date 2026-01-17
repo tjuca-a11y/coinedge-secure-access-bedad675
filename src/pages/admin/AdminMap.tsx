@@ -100,7 +100,7 @@ const AdminMap: React.FC = () => {
               ) : (
                 <div className="space-y-3">
                   {merchants
-                    ?.filter((m) => m.status === 'kyc_pending')
+                    ?.filter((m) => m.status === 'approved')
                     .slice(0, 3)
                     .map((merchant) => (
                       <div
@@ -112,7 +112,7 @@ const AdminMap: React.FC = () => {
                         </div>
                         <div className="flex-1">
                           <p className="font-medium">{merchant.business_name}</p>
-                          <p className="text-xs text-muted-foreground">KYC Pending Review</p>
+                          <p className="text-xs text-muted-foreground">Pending Activation</p>
                         </div>
                       </div>
                     )) || (

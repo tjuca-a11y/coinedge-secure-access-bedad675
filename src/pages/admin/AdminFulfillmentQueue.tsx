@@ -170,7 +170,7 @@ const AdminFulfillmentQueue: React.FC = () => {
   });
 
   // Count orders by status
-  const pendingCount = orders?.filter(o => ['SUBMITTED', 'WAITING_INVENTORY', 'KYC_PENDING'].includes(o.status)).length || 0;
+  const pendingCount = orders?.filter(o => ['SUBMITTED', 'WAITING_INVENTORY'].includes(o.status)).length || 0;
   const readyCount = orders?.filter(o => o.status === 'READY_TO_SEND').length || 0;
 
   return (

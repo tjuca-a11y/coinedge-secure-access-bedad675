@@ -70,7 +70,6 @@ const SalesRepMerchants: React.FC = () => {
     { value: 'lead', label: 'Lead' },
     { value: 'invited', label: 'Invited' },
     { value: 'onboarding_started', label: 'Onboarding' },
-    { value: 'kyc_pending', label: 'KYC Pending' },
     { value: 'approved', label: 'Approved' },
     { value: 'active', label: 'Active' },
     { value: 'paused', label: 'Paused' },

@@ -9,7 +9,7 @@ interface DashboardStats {
   totalRepCommissions: number;
   merchantCount: number;
   salesRepCount: number;
-  pendingKycCount: number;
+  pendingApprovalCount: number;
 }
 
 export const useAdminStats = () => {
@@ -39,11 +39,11 @@ export const useAdminStats = () => {
         .from('sales_reps')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch pending KYC count
-      const { count: pendingKycCount } = await supabase
+      // Fetch pending approval count (merchants awaiting activation)
+      const { count: pendingApprovalCount } = await supabase
         .from('merchants')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'kyc_pending');
+        .eq('status', 'approved');
 
       return {
         totalBitcardsActivated: activatedBitcards.length,
@@ -53,7 +53,7 @@ export const useAdminStats = () => {
         totalRepCommissions,
         merchantCount: merchantCount || 0,
         salesRepCount: salesRepCount || 0,
-        pendingKycCount: pendingKycCount || 0,
+        pendingApprovalCount: pendingApprovalCount || 0,
       };
     },
   });

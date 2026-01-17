@@ -78,8 +78,8 @@ const AdminDashboard: React.FC = () => {
       icon: Users,
     },
     {
-      title: 'Pending KYC',
-      value: stats?.pendingKycCount || 0,
+      title: 'Pending Activation',
+      value: stats?.pendingApprovalCount || 0,
       icon: AlertCircle,
     },
   ];

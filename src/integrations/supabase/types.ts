@@ -1154,6 +1154,7 @@ export type Database = {
         Row: {
           admin_pin_hash: string | null
           business_name: string
+          category: string | null
           city: string | null
           created_at: string
           email: string
@@ -1173,6 +1174,7 @@ export type Database = {
         Insert: {
           admin_pin_hash?: string | null
           business_name: string
+          category?: string | null
           city?: string | null
           created_at?: string
           email: string
@@ -1192,6 +1194,7 @@ export type Database = {
         Update: {
           admin_pin_hash?: string | null
           business_name?: string
+          category?: string | null
           city?: string | null
           created_at?: string
           email?: string
@@ -1805,7 +1808,6 @@ export type Database = {
         | "lead"
         | "invited"
         | "onboarding_started"
-        | "kyc_pending"
         | "approved"
         | "active"
         | "paused"
@@ -1987,7 +1989,6 @@ export const Constants = {
         "lead",
         "invited",
         "onboarding_started",
-        "kyc_pending",
         "approved",
         "active",
         "paused",
