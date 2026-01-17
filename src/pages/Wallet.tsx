@@ -133,14 +133,24 @@ const Wallet: React.FC = () => {
   // Show BTC Detail View
   if (showBtcDetail && isKycApproved) {
     return (
-      <BtcDetailView
-        btcBalance={btcBalance}
-        btcPrice={currentBtcPrice}
-        totalPortfolioValue={totalBalance}
-        onBack={() => setShowBtcDetail(false)}
-        onBuy={() => setBuySellModalOpen(true)}
-        onSell={() => setBuySellModalOpen(true)}
-      />
+      <>
+        <BtcDetailView
+          btcBalance={btcBalance}
+          btcPrice={currentBtcPrice}
+          totalPortfolioValue={totalBalance}
+          onBack={() => setShowBtcDetail(false)}
+          onBuy={() => setBuySellModalOpen(true)}
+          onSell={() => setBuySellModalOpen(true)}
+        />
+        {/* Buy/Sell BTC Modal - needs to be rendered here too */}
+        <BuySellBtcModal
+          open={buySellModalOpen}
+          onOpenChange={setBuySellModalOpen}
+          currentBtcPrice={currentBtcPrice}
+          btcBalance={btcBalance}
+          usdcBalance={usdcBalance}
+        />
+      </>
     );
   }
 
