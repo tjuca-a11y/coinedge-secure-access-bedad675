@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDynamicWallet } from "@/contexts/DynamicWalletContext";
-import { Send, Download, Gift, Bitcoin, DollarSign, Copy, TrendingUp, TrendingDown, Minus, Building2, Shield, Loader2 } from "lucide-react";
+import { Send, Download, Gift, Bitcoin, DollarSign, Copy, TrendingUp, TrendingDown, Minus, Shield, Loader2, ShoppingCart, TrendingUp as SellIcon } from "lucide-react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -249,21 +249,30 @@ const Wallet: React.FC = () => {
             Receive
           </Button>
           <Button 
+            variant="outline" 
             disabled={!isKycApproved} 
-            className="gap-2 bg-accent hover:bg-accent/90 flex-1 sm:flex-none text-sm"
+            className="gap-2 flex-1 sm:flex-none text-sm"
+            onClick={() => setBuySellModalOpen(true)}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Buy
+          </Button>
+          <Button 
+            variant="outline" 
+            disabled={!isKycApproved} 
+            className="gap-2 flex-1 sm:flex-none text-sm"
+            onClick={() => setBuySellModalOpen(true)}
+          >
+            <SellIcon className="h-4 w-4" />
+            Sell
+          </Button>
+          <Button 
+            disabled={!isKycApproved} 
+            className="gap-2 flex-1 sm:flex-none text-sm bg-gradient-to-r from-primary to-pink-500 hover:from-primary/90 hover:to-pink-500/90"
             onClick={() => navigate("/redeem")}
           >
             <Gift className="h-4 w-4" />
             Redeem
-          </Button>
-          <Button 
-            variant="secondary"
-            disabled={!isKycApproved} 
-            className="gap-2 flex-1 sm:flex-none text-sm"
-            onClick={() => setCashOutModalOpen(true)}
-          >
-            <Building2 className="h-4 w-4" />
-            Cash Out
           </Button>
         </div>
 
