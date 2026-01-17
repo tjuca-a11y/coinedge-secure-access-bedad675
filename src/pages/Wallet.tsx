@@ -17,6 +17,7 @@ import { CashOutModal } from "@/components/wallet/CashOutModal";
 import { CashOutHistory } from "@/components/wallet/CashOutHistory";
 import { ReceiveModal } from "@/components/wallet/ReceiveModal";
 import { BankAccountsCard } from "@/components/wallet/BankAccountsCard";
+import { BtcDetailView } from "@/components/wallet/BtcDetailView";
 import { Badge } from "@/components/ui/badge";
 
 // Mock account performance data with more realistic values for demo
@@ -68,6 +69,7 @@ const Wallet: React.FC = () => {
   const [usdcActionsModalOpen, setUsdcActionsModalOpen] = useState(false);
   const [cashOutModalOpen, setCashOutModalOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
+  const [showBtcDetail, setShowBtcDetail] = useState(false);
 
   // Use centralized KYC status from syncedProfile for Dynamic users
   const isKycApproved = isDynamicAuthenticated
@@ -125,6 +127,20 @@ const Wallet: React.FC = () => {
           </Card>
         </div>
       </DashboardLayout>
+    );
+  }
+
+  // Show BTC Detail View
+  if (showBtcDetail && isKycApproved) {
+    return (
+      <BtcDetailView
+        btcBalance={btcBalance}
+        btcPrice={currentBtcPrice}
+        totalPortfolioValue={totalBalance}
+        onBack={() => setShowBtcDetail(false)}
+        onBuy={() => setBuySellModalOpen(true)}
+        onSell={() => setBuySellModalOpen(true)}
+      />
     );
   }
 
@@ -280,7 +296,7 @@ const Wallet: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
           <Card 
             className={isKycApproved ? "cursor-pointer transition-all hover:border-btc/50 hover:shadow-md" : ""}
-            onClick={() => isKycApproved && setBuySellModalOpen(true)}
+            onClick={() => isKycApproved && setShowBtcDetail(true)}
           >
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
