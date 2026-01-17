@@ -37,6 +37,7 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSalesReps from "./pages/admin/AdminSalesReps";
 import AdminMerchants from "./pages/admin/AdminMerchants";
+import AdminMerchantDetail from "./pages/admin/AdminMerchantDetail";
 import AdminBitcards from "./pages/admin/AdminBitcards";
 import AdminCommissions from "./pages/admin/AdminCommissions";
 import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
@@ -91,6 +92,7 @@ const App = () => (
                   <Route path="dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
                   <Route path="sales-reps" element={<AdminProtectedRoute><AdminSalesReps /></AdminProtectedRoute>} />
                   <Route path="merchants" element={<AdminProtectedRoute><AdminMerchants /></AdminProtectedRoute>} />
+                  <Route path="merchants/:id" element={<AdminProtectedRoute><AdminMerchantDetail /></AdminProtectedRoute>} />
                   <Route path="bitcards" element={<AdminProtectedRoute><AdminBitcards /></AdminProtectedRoute>} />
                   <Route path="commissions" element={<AdminProtectedRoute><AdminCommissions /></AdminProtectedRoute>} />
                   <Route path="inventory" element={<AdminProtectedRoute><AdminInventoryDashboard /></AdminProtectedRoute>} />

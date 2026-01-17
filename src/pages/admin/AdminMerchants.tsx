@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ import { Plus, MoreHorizontal, UserPlus, CheckCircle, Eye, Search } from 'lucide
 import { format } from 'date-fns';
 
 const AdminMerchants: React.FC = () => {
+  const navigate = useNavigate();
   const { data: merchants, isLoading } = useMerchants();
   const { data: salesReps } = useSalesReps();
   const { toast } = useToast();
@@ -376,7 +378,11 @@ const AdminMerchants: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {filteredMerchants.map((merchant) => (
-                  <TableRow key={merchant.id}>
+                  <TableRow 
+                    key={merchant.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/admin/merchants/${merchant.id}`)}
+                  >
                     <TableCell>
                       <div>
                         <p className="font-medium">{merchant.business_name}</p>
