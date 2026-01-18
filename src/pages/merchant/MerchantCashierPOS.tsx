@@ -12,7 +12,7 @@ import { Scan, DollarSign, CheckCircle, Loader2, Camera, Wallet } from 'lucide-r
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PaymentMethodToggle } from '@/components/merchant/PaymentMethodToggle';
 import { CommissionDisplay, CommissionSuccess } from '@/components/merchant/CommissionDisplay';
-import { useFeeCalculation, formatCurrency, type PaymentMethod } from '@/hooks/useFeeCalculation';
+import { usePosFeeCalculation, formatCurrency, type PaymentMethod, POS_FEE_RATE_CARD, POS_FEE_RATE_CASH } from '@/hooks/useFeeCalculation';
 import { useSquarePayment } from '@/hooks/useSquarePayment';
 
 const MerchantCashierPOS: React.FC = () => {
@@ -30,9 +30,10 @@ const MerchantCashierPOS: React.FC = () => {
   const baseAmount = parseFloat(amount) || 0;
   const cashBalance = wallet?.cash_credit_balance ?? 0;
   
-  const cardFees = useFeeCalculation(baseAmount, 'CARD');
-  const cashFees = useFeeCalculation(baseAmount, 'CASH');
+  const cardFees = usePosFeeCalculation(baseAmount, 'CARD');
+  const cashFees = usePosFeeCalculation(baseAmount, 'CASH');
   const currentFees = paymentMethod === 'CASH' ? cashFees : cardFees;
+  const posFeeRate = paymentMethod === 'CASH' ? POS_FEE_RATE_CASH : POS_FEE_RATE_CARD;
 
   const squarePayment = useSquarePayment({
     onSuccess: () => {
@@ -330,8 +331,8 @@ const MerchantCashierPOS: React.FC = () => {
                 <span>{formatCurrency(baseAmount)}</span>
               </div>
               <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
-                <span>Service Fee (13.75%)</span>
-                <span>{formatCurrency(currentFees.totalFee)}</span>
+                <span>Service Fee ({(posFeeRate * 100).toFixed(0)}%)</span>
+                <span>{formatCurrency(currentFees.totalPosFee)}</span>
               </div>
               <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
                 <span>Customer Pays</span>

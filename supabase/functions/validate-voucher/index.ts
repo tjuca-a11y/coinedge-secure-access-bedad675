@@ -150,10 +150,25 @@ serve(async (req) => {
       });
     }
 
+    // Get the activation event to check for stored redemption fee rate
+    const { data: activationEvent } = await supabase
+      .from('bitcard_activation_events')
+      .select('redemption_fee_rate')
+      .eq('bitcard_id', bitcard.id)
+      .single();
+
+    const redemptionFeeRate = activationEvent?.redemption_fee_rate ?? 0.0875; // Default 8.75%
+    const grossAmount = bitcard.usd_value || 0;
+    const redemptionFee = grossAmount * redemptionFeeRate;
+    const netAmount = grossAmount - redemptionFee;
+
     // Voucher is valid and active
     return new Response(JSON.stringify({
       valid: true,
-      amount: bitcard.usd_value || 0,
+      amount: grossAmount,
+      netAmount: netAmount,
+      redemptionFee: redemptionFee,
+      redemptionFeeRate: redemptionFeeRate,
       asset: 'BTC', // Bitcards are always redeemed as BTC
       bitcardId: bitcard.id,
     }), {

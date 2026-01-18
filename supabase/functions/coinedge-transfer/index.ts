@@ -551,12 +551,34 @@ serve(async (req) => {
           });
         }
 
+        // Get activation event to fetch the locked-in redemption fee rate
+        const { data: activationEvent } = await supabase
+          .from('bitcard_activation_events')
+          .select('id, redemption_fee_rate, merchant_id')
+          .eq('bitcard_id', bitcard.id)
+          .single();
+
+        const redemptionFeeRate = activationEvent?.redemption_fee_rate ?? 0.0875; // Default 8.75%
+        const grossUsdValue = bitcard.usd_value || 0;
+        
+        // Calculate redemption fees (8.75% default)
+        const totalRedemptionFee = grossUsdValue * redemptionFeeRate;
+        const salesRepFee = grossUsdValue * 0.02;
+        const volatilityReserve = grossUsdValue * 0.03;
+        const coinedgeRevenue = grossUsdValue * 0.0375;
+        
+        // Net USD value after redemption fees
+        const netUsdValue = grossUsdValue - totalRedemptionFee;
+
         // Get current BTC price
         const { getBtcPrice } = await import('../_shared/price-oracle.ts');
         const priceResult = await getBtcPrice();
         const btcPrice = priceResult.price;
-        const usdValue = bitcard.usd_value || 0;
-        const btcAmount = usdValue / btcPrice;
+        
+        // BTC amount based on NET value (after 8.75% fee deducted)
+        const btcAmount = netUsdValue / btcPrice;
+
+        console.log(`Redeeming voucher: gross=$${grossUsdValue}, fee=$${totalRedemptionFee} (${redemptionFeeRate * 100}%), net=$${netUsdValue}, btc=${btcAmount}`);
 
         // Mark bitcard as redeemed FIRST (prevent double redemption)
         const { error: updateError } = await supabase
@@ -576,7 +598,7 @@ serve(async (req) => {
           });
         }
 
-        // Create fulfillment order for BTC redemption
+        // Create fulfillment order for BTC redemption (using NET value)
         const { data: fulfillmentOrder, error: fulfillmentError } = await supabase
           .from('fulfillment_orders')
           .insert({
@@ -586,7 +608,7 @@ serve(async (req) => {
             destination_wallet_address: destinationAddress,
             btc_amount: btcAmount,
             btc_price_used: btcPrice,
-            usd_value: usdValue,
+            usd_value: netUsdValue, // Store NET value
             status: 'SUBMITTED',
             kyc_status: 'APPROVED',
           })
@@ -601,6 +623,44 @@ serve(async (req) => {
             status: 500,
             headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json' },
           });
+        }
+
+        // Create fee distribution record for this redemption
+        if (activationEvent?.id) {
+          await supabase.from('fee_distributions').insert({
+            activation_event_id: activationEvent.id,
+            base_amount_usd: grossUsdValue,
+            customer_paid_usd: grossUsdValue, // At redemption, customer "pays" the fees from card value
+            total_fee_usd: totalRedemptionFee,
+            payment_method: 'CARD', // Redemption fees are standard regardless of original payment
+            sales_rep_fee_usd: salesRepFee,
+            volatility_reserve_usd: volatilityReserve,
+            coinedge_revenue_usd: coinedgeRevenue,
+            merchant_fee_usd: 0, // Merchant was already paid at POS
+            square_processing_usd: 0,
+          });
+
+          // Get merchant to find sales rep
+          const { data: merchant } = await supabase
+            .from('merchants')
+            .select('rep_id')
+            .eq('id', activationEvent.merchant_id)
+            .single();
+
+          // Create commission ledger entry for sales rep
+          if (merchant?.rep_id) {
+            await supabase.from('commission_ledger').insert({
+              commission_id: `comm_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`,
+              rep_id: merchant.rep_id,
+              merchant_id: activationEvent.merchant_id,
+              bitcard_id: bitcard.id,
+              card_value_usd: grossUsdValue,
+              activation_fee_usd: totalRedemptionFee,
+              rep_commission_usd: salesRepFee,
+              coinedge_revenue_usd: coinedgeRevenue,
+              status: 'accrued',
+            });
+          }
         }
 
         // Try to auto-fill from eligible inventory
@@ -639,7 +699,10 @@ serve(async (req) => {
           metadata: {
             voucher_code: cleanVoucherCode,
             bitcard_id: bitcard.id,
-            usd_value: usdValue,
+            gross_usd_value: grossUsdValue,
+            redemption_fee: totalRedemptionFee,
+            redemption_fee_rate: redemptionFeeRate,
+            net_usd_value: netUsdValue,
             btc_amount: btcAmount,
             btc_price: btcPrice,
             destination: destinationAddress,
@@ -657,8 +720,11 @@ serve(async (req) => {
           message: autoFilled 
             ? 'Voucher redeemed! BTC has been sent to your wallet.'
             : 'Voucher redeemed! BTC will be sent to your wallet shortly.',
+          grossUsdValue,
+          redemptionFee: totalRedemptionFee,
+          redemptionFeeRate,
+          netUsdValue,
           btcAmount,
-          usdValue,
           btcPrice,
           txHash,
           autoFilled,

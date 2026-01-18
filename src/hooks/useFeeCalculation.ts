@@ -2,59 +2,109 @@ import { useMemo } from 'react';
 
 export type PaymentMethod = 'CARD' | 'CASH';
 
-export interface FeeBreakdown {
+export interface PosFeeBreakdown {
   baseAmount: number;
-  totalFee: number;
-  customerPays: number;
-  salesRepFee: number;
   merchantFee: number;
-  volatilityReserve: number;
   squareProcessing: number;
-  coinedgeRevenue: number;
+  totalPosFee: number;
+  customerPays: number;
   merchantCommissionRate: number;
 }
 
-// Fee rates as percentages of base amount
-const FEE_RATES = {
+export interface RedemptionFeeBreakdown {
+  baseAmount: number;
+  salesRepFee: number;
+  volatilityReserve: number;
+  coinedgeRevenue: number;
+  totalRedemptionFee: number;
+  netValue: number;
+}
+
+export interface FeeBreakdown extends PosFeeBreakdown, RedemptionFeeBreakdown {
+  totalFee: number;
+}
+
+// POS Fee rates (charged at purchase)
+const POS_FEE_RATES = {
+  MERCHANT_CARD: 0.02,     // 2%
+  MERCHANT_CASH: 0.05,     // 5%
+  SQUARE_PROCESSING: 0.03, // 3% (card only)
+};
+
+// Redemption fee rates (deducted when claiming BTC)
+const REDEMPTION_FEE_RATES = {
   SALES_REP: 0.02,        // 2%
-  MERCHANT_CARD: 0.02,    // 2% for card
-  MERCHANT_CASH: 0.05,    // 5% for cash
   VOLATILITY: 0.03,       // 3%
-  SQUARE_PROCESSING: 0.03, // 3% (only for card)
   COINEDGE: 0.0375,       // 3.75%
 };
 
+export const POS_FEE_RATE_CARD = POS_FEE_RATES.MERCHANT_CARD + POS_FEE_RATES.SQUARE_PROCESSING; // 5%
+export const POS_FEE_RATE_CASH = POS_FEE_RATES.MERCHANT_CASH; // 5%
+export const REDEMPTION_FEE_RATE = REDEMPTION_FEE_RATES.SALES_REP + REDEMPTION_FEE_RATES.VOLATILITY + REDEMPTION_FEE_RATES.COINEDGE; // 8.75%
+
+// Legacy total for reference (not used at POS anymore)
 export const TOTAL_FEE_RATE = 0.1375; // 13.75%
 
-export function calculateFees(baseAmount: number, paymentMethod: PaymentMethod): FeeBreakdown {
-  const totalFee = baseAmount * TOTAL_FEE_RATE;
-  const customerPays = baseAmount + totalFee;
-  
-  const salesRepFee = baseAmount * FEE_RATES.SALES_REP;
+export function calculatePosFees(baseAmount: number, paymentMethod: PaymentMethod): PosFeeBreakdown {
   const merchantFee = paymentMethod === 'CASH' 
-    ? baseAmount * FEE_RATES.MERCHANT_CASH 
-    : baseAmount * FEE_RATES.MERCHANT_CARD;
-  const volatilityReserve = baseAmount * FEE_RATES.VOLATILITY;
+    ? baseAmount * POS_FEE_RATES.MERCHANT_CASH 
+    : baseAmount * POS_FEE_RATES.MERCHANT_CARD;
+  
   const squareProcessing = paymentMethod === 'CARD' 
-    ? baseAmount * FEE_RATES.SQUARE_PROCESSING 
+    ? baseAmount * POS_FEE_RATES.SQUARE_PROCESSING 
     : 0;
-  const coinedgeRevenue = baseAmount * FEE_RATES.COINEDGE;
+  
+  const totalPosFee = merchantFee + squareProcessing;
+  const customerPays = baseAmount + totalPosFee;
   
   return {
     baseAmount,
-    totalFee,
-    customerPays,
-    salesRepFee,
     merchantFee,
-    volatilityReserve,
     squareProcessing,
-    coinedgeRevenue,
+    totalPosFee,
+    customerPays,
     merchantCommissionRate: paymentMethod === 'CASH' ? 5 : 2,
+  };
+}
+
+export function calculateRedemptionFees(baseAmount: number): RedemptionFeeBreakdown {
+  const salesRepFee = baseAmount * REDEMPTION_FEE_RATES.SALES_REP;
+  const volatilityReserve = baseAmount * REDEMPTION_FEE_RATES.VOLATILITY;
+  const coinedgeRevenue = baseAmount * REDEMPTION_FEE_RATES.COINEDGE;
+  const totalRedemptionFee = salesRepFee + volatilityReserve + coinedgeRevenue;
+  const netValue = baseAmount - totalRedemptionFee;
+  
+  return {
+    baseAmount,
+    salesRepFee,
+    volatilityReserve,
+    coinedgeRevenue,
+    totalRedemptionFee,
+    netValue,
+  };
+}
+
+export function calculateFees(baseAmount: number, paymentMethod: PaymentMethod): FeeBreakdown {
+  const posFees = calculatePosFees(baseAmount, paymentMethod);
+  const redemptionFees = calculateRedemptionFees(baseAmount);
+  
+  return {
+    ...posFees,
+    ...redemptionFees,
+    totalFee: posFees.totalPosFee + redemptionFees.totalRedemptionFee,
   };
 }
 
 export function useFeeCalculation(baseAmount: number, paymentMethod: PaymentMethod): FeeBreakdown {
   return useMemo(() => calculateFees(baseAmount, paymentMethod), [baseAmount, paymentMethod]);
+}
+
+export function usePosFeeCalculation(baseAmount: number, paymentMethod: PaymentMethod): PosFeeBreakdown {
+  return useMemo(() => calculatePosFees(baseAmount, paymentMethod), [baseAmount, paymentMethod]);
+}
+
+export function useRedemptionFeeCalculation(baseAmount: number): RedemptionFeeBreakdown {
+  return useMemo(() => calculateRedemptionFees(baseAmount), [baseAmount]);
 }
 
 export function formatCurrency(amount: number): string {
