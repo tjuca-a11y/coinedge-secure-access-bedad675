@@ -9,8 +9,6 @@ interface PaymentMethodToggleProps {
   onChange: (method: PaymentMethod) => void;
   cashBalance: number;
   baseAmount: number;
-  cardCommission: number;
-  cashCommission: number;
   disabled?: boolean;
 }
 
@@ -19,8 +17,6 @@ export const PaymentMethodToggle: React.FC<PaymentMethodToggleProps> = ({
   onChange,
   cashBalance,
   baseAmount,
-  cardCommission,
-  cashCommission,
   disabled = false,
 }) => {
   const canUseCash = cashBalance >= baseAmount && baseAmount > 0;
@@ -43,9 +39,6 @@ export const PaymentMethodToggle: React.FC<PaymentMethodToggleProps> = ({
         <CreditCard className="h-8 w-8" />
         <span className="text-lg font-semibold">Card</span>
         <span className="text-sm text-muted-foreground">Tap to Pay</span>
-        <span className="text-xs font-medium text-green-600">
-          +{formatCurrency(cardCommission)} commission
-        </span>
       </button>
 
       {/* Cash Option */}
@@ -65,9 +58,6 @@ export const PaymentMethodToggle: React.FC<PaymentMethodToggleProps> = ({
         <span className="text-lg font-semibold">Cash</span>
         <span className="text-sm text-muted-foreground">
           {canUseCash ? `${formatCurrency(cashBalance)} available` : 'Insufficient credit'}
-        </span>
-        <span className="text-xs font-medium text-green-600">
-          +{formatCurrency(cashCommission)} commission
         </span>
       </button>
     </div>
