@@ -94,24 +94,38 @@ const SalesRepCommissions: React.FC = () => {
 
       {/* Commission Model */}
       <Card className="mb-6 border-primary/20 bg-primary/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">How You Earn</CardTitle>
+        </CardHeader>
         <CardContent className="py-4">
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm">
-            <div className="text-center">
-              <p className="text-muted-foreground">Activation Fee</p>
-              <p className="font-bold text-lg">10%</p>
-              <p className="text-xs text-muted-foreground">of card value</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border bg-background p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="rounded-full bg-success/10 p-2">
+                  <DollarSign className="h-4 w-4 text-success" />
+                </div>
+                <div>
+                  <p className="font-semibold">Merchant Signup Bonus</p>
+                  <p className="text-2xl font-bold text-success">$50</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                One-time bonus when your merchant completes their initial cash credit funding
+              </p>
             </div>
-            <div className="text-2xl text-muted-foreground">→</div>
-            <div className="text-center">
-              <p className="text-muted-foreground">CoinEdge Share</p>
-              <p className="font-bold text-lg">70%</p>
-              <p className="text-xs text-muted-foreground">of fee</p>
-            </div>
-            <div className="text-2xl text-muted-foreground">+</div>
-            <div className="text-center">
-              <p className="text-muted-foreground">Your Commission</p>
-              <p className="font-bold text-lg text-success">30%</p>
-              <p className="text-xs text-muted-foreground">of fee (3% of card)</p>
+            <div className="rounded-lg border bg-background p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="rounded-full bg-primary/10 p-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold">Redemption Commission</p>
+                  <p className="text-2xl font-bold text-primary">2%</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Earned each time a customer redeems a BitCard from your merchant
+              </p>
             </div>
           </div>
         </CardContent>
