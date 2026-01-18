@@ -145,8 +145,13 @@ export type Database = {
           activation_method: Database["public"]["Enums"]["activation_method"]
           bitcard_id: string
           created_at: string
+          customer_amount_paid: number | null
           id: string
+          merchant_commission_usd: number | null
           merchant_id: string
+          payment_method:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
           usd_value: number
         }
         Insert: {
@@ -154,8 +159,13 @@ export type Database = {
           activation_method?: Database["public"]["Enums"]["activation_method"]
           bitcard_id: string
           created_at?: string
+          customer_amount_paid?: number | null
           id?: string
+          merchant_commission_usd?: number | null
           merchant_id: string
+          payment_method?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
           usd_value: number
         }
         Update: {
@@ -163,8 +173,13 @@ export type Database = {
           activation_method?: Database["public"]["Enums"]["activation_method"]
           bitcard_id?: string
           created_at?: string
+          customer_amount_paid?: number | null
           id?: string
+          merchant_commission_usd?: number | null
           merchant_id?: string
+          payment_method?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
           usd_value?: number
         }
         Relationships: [
@@ -705,6 +720,59 @@ export type Database = {
         }
         Relationships: []
       }
+      fee_distributions: {
+        Row: {
+          activation_event_id: string
+          base_amount_usd: number
+          coinedge_revenue_usd: number
+          created_at: string
+          customer_paid_usd: number
+          id: string
+          merchant_fee_usd: number
+          payment_method: Database["public"]["Enums"]["payment_method_type"]
+          sales_rep_fee_usd: number
+          square_processing_usd: number
+          total_fee_usd: number
+          volatility_reserve_usd: number
+        }
+        Insert: {
+          activation_event_id: string
+          base_amount_usd: number
+          coinedge_revenue_usd?: number
+          created_at?: string
+          customer_paid_usd: number
+          id?: string
+          merchant_fee_usd?: number
+          payment_method: Database["public"]["Enums"]["payment_method_type"]
+          sales_rep_fee_usd?: number
+          square_processing_usd?: number
+          total_fee_usd: number
+          volatility_reserve_usd?: number
+        }
+        Update: {
+          activation_event_id?: string
+          base_amount_usd?: number
+          coinedge_revenue_usd?: number
+          created_at?: string
+          customer_paid_usd?: number
+          id?: string
+          merchant_fee_usd?: number
+          payment_method?: Database["public"]["Enums"]["payment_method_type"]
+          sales_rep_fee_usd?: number
+          square_processing_usd?: number
+          total_fee_usd?: number
+          volatility_reserve_usd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_distributions_activation_event_id_fkey"
+            columns: ["activation_event_id"]
+            isOneToOne: false
+            referencedRelation: "bitcard_activation_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fulfillment_orders: {
         Row: {
           bitcard_id: string | null
@@ -1124,18 +1192,21 @@ export type Database = {
       merchant_wallets: {
         Row: {
           balance_usd: number
+          cash_credit_balance: number | null
           id: string
           merchant_id: string
           updated_at: string
         }
         Insert: {
           balance_usd?: number
+          cash_credit_balance?: number | null
           id?: string
           merchant_id: string
           updated_at?: string
         }
         Update: {
           balance_usd?: number
+          cash_credit_balance?: number | null
           id?: string
           merchant_id?: string
           updated_at?: string
@@ -1159,6 +1230,8 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          initial_funding_date: string | null
+          is_initially_funded: boolean | null
           lat: number | null
           lng: number | null
           merchant_id: string
@@ -1179,6 +1252,8 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          initial_funding_date?: string | null
+          is_initially_funded?: boolean | null
           lat?: number | null
           lng?: number | null
           merchant_id: string
@@ -1199,6 +1274,8 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          initial_funding_date?: string | null
+          is_initially_funded?: boolean | null
           lat?: number | null
           lng?: number | null
           merchant_id?: string
@@ -1803,7 +1880,15 @@ export type Database = {
         | "expired"
       kyc_fulfillment_status: "PENDING" | "APPROVED" | "REJECTED"
       kyc_status: "not_started" | "pending" | "approved" | "rejected"
-      merchant_ledger_type: "TOPUP" | "ACTIVATION_DEBIT" | "ADJUSTMENT"
+      merchant_ledger_type:
+        | "TOPUP"
+        | "ACTIVATION_DEBIT"
+        | "ADJUSTMENT"
+        | "MERCHANT_COMMISSION_CARD"
+        | "MERCHANT_COMMISSION_CASH"
+        | "CASH_SALE_DEBIT"
+        | "INITIAL_FUNDING"
+        | "SALES_REP_BONUS"
       merchant_status:
         | "lead"
         | "invited"
@@ -1813,6 +1898,7 @@ export type Database = {
         | "paused"
       merchant_user_role: "MERCHANT_ADMIN" | "CASHIER"
       merchant_user_status: "ACTIVE" | "DISABLED"
+      payment_method_type: "CARD" | "CASH"
       rep_status: "draft" | "cleared" | "active" | "disabled"
       square_payment_status: "CREATED" | "PAID" | "FAILED" | "CANCELED"
       swap_order_status:
@@ -1984,7 +2070,16 @@ export const Constants = {
       ],
       kyc_fulfillment_status: ["PENDING", "APPROVED", "REJECTED"],
       kyc_status: ["not_started", "pending", "approved", "rejected"],
-      merchant_ledger_type: ["TOPUP", "ACTIVATION_DEBIT", "ADJUSTMENT"],
+      merchant_ledger_type: [
+        "TOPUP",
+        "ACTIVATION_DEBIT",
+        "ADJUSTMENT",
+        "MERCHANT_COMMISSION_CARD",
+        "MERCHANT_COMMISSION_CASH",
+        "CASH_SALE_DEBIT",
+        "INITIAL_FUNDING",
+        "SALES_REP_BONUS",
+      ],
       merchant_status: [
         "lead",
         "invited",
@@ -1995,6 +2090,7 @@ export const Constants = {
       ],
       merchant_user_role: ["MERCHANT_ADMIN", "CASHIER"],
       merchant_user_status: ["ACTIVE", "DISABLED"],
+      payment_method_type: ["CARD", "CASH"],
       rep_status: ["draft", "cleared", "active", "disabled"],
       square_payment_status: ["CREATED", "PAID", "FAILED", "CANCELED"],
       swap_order_status: [
