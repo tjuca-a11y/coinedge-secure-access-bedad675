@@ -83,14 +83,14 @@ const SalesRepDashboard: React.FC = () => {
       {/* Commission Model Info */}
       <Card className="mb-6 border-primary/20 bg-primary/5">
         <CardContent className="py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <DollarSign className="h-5 w-5 text-primary" />
               <div>
                 <p className="font-medium">Your Commission Model</p>
                 <p className="text-sm text-muted-foreground">
-                  You earn <span className="font-semibold text-primary">3%</span> of each BitCard's face value
-                  (30% of the 10% activation fee)
+                  <span className="font-semibold text-success">$50</span> per merchant signup + 
+                  <span className="font-semibold text-primary ml-1">2%</span> on every BitCard redemption
                 </p>
               </div>
             </div>
@@ -158,7 +158,7 @@ const SalesRepDashboard: React.FC = () => {
                   <div className="text-2xl font-bold text-success">
                     {statsLoading ? '...' : formatCurrency(stats?.[period.key]?.commissionEarned || 0)}
                   </div>
-                  <p className="text-xs text-muted-foreground">Your earnings (3% of card value)</p>
+                  <p className="text-xs text-muted-foreground">Your earnings (2% of redemptions + bonuses)</p>
                 </CardContent>
               </Card>
             </div>
@@ -280,7 +280,7 @@ const SalesRepDashboard: React.FC = () => {
                   <th className="pb-3 text-left font-medium text-muted-foreground">Period</th>
                   <th className="pb-3 text-right font-medium text-muted-foreground">Activated USD</th>
                   <th className="pb-3 text-right font-medium text-muted-foreground">Cards</th>
-                  <th className="pb-3 text-right font-medium text-muted-foreground">Commission (3%)</th>
+                  <th className="pb-3 text-right font-medium text-muted-foreground">Commission</th>
                 </tr>
               </thead>
               <tbody>
