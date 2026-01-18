@@ -44,10 +44,11 @@ serve(async (req) => {
       });
     }
 
-    // Calculate total with 13.75% fee
-    const FEE_RATE = 0.1375;
-    const totalFee = base_amount_usd * FEE_RATE;
-    const customerPays = Math.round((base_amount_usd + totalFee) * 100); // Convert to cents
+    // Calculate Square processing fee: 2.6% + $0.15
+    const SQUARE_PROCESSING_RATE = 0.026;
+    const SQUARE_PROCESSING_FIXED = 0.15;
+    const squareProcessingFee = (base_amount_usd * SQUARE_PROCESSING_RATE) + SQUARE_PROCESSING_FIXED;
+    const customerPays = Math.round((base_amount_usd + squareProcessingFee) * 100); // Convert to cents
 
     const squareBaseUrl = SQUARE_ENVIRONMENT === 'production' 
       ? 'https://connect.squareup.com' 
