@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { SalesRepLayout } from '@/components/sales-rep/SalesRepLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Table,
   TableBody,
@@ -11,8 +14,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useSalesRepCommissions, useSalesRepStats } from '@/hooks/useSalesRepData';
-import { DollarSign, CreditCard, TrendingUp } from 'lucide-react';
-import { format } from 'date-fns';
+import { DollarSign, CreditCard, TrendingUp, CalendarIcon, X } from 'lucide-react';
+import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-US', {
@@ -24,6 +28,40 @@ const formatCurrency = (amount: number) => {
 const SalesRepCommissions: React.FC = () => {
   const { data: commissions, isLoading } = useSalesRepCommissions();
   const { data: stats } = useSalesRepStats();
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
+
+  const filteredCommissions = useMemo(() => {
+    if (!commissions) return [];
+    if (!dateRange.from && !dateRange.to) return commissions;
+
+    return commissions.filter((commission) => {
+      const commissionDate = new Date(commission.activated_at);
+      
+      if (dateRange.from && dateRange.to) {
+        return isWithinInterval(commissionDate, {
+          start: startOfDay(dateRange.from),
+          end: endOfDay(dateRange.to),
+        });
+      }
+      
+      if (dateRange.from) {
+        return commissionDate >= startOfDay(dateRange.from);
+      }
+      
+      return true;
+    });
+  }, [commissions, dateRange]);
+
+  const filteredStats = useMemo(() => {
+    return {
+      totalCommission: filteredCommissions.reduce((sum, c) => sum + Number(c.rep_commission_usd), 0),
+      totalActivatedUsd: filteredCommissions.reduce((sum, c) => sum + Number(c.card_value_usd), 0),
+      count: filteredCommissions.length,
+    };
+  }, [filteredCommissions]);
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -34,6 +72,10 @@ const SalesRepCommissions: React.FC = () => {
       default:
         return 'outline';
     }
+  };
+
+  const clearDateFilter = () => {
+    setDateRange({ from: undefined, to: undefined });
   };
 
   return (
@@ -134,14 +176,73 @@ const SalesRepCommissions: React.FC = () => {
       {/* Commission History */}
       <Card>
         <CardHeader>
-          <CardTitle>Commission History</CardTitle>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Commission History</CardTitle>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      'justify-start text-left font-normal',
+                      !dateRange.from && 'text-muted-foreground'
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
+                        </>
+                      ) : (
+                        format(dateRange.from, 'MMM d, yyyy')
+                      )
+                    ) : (
+                      <span>Select date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="range"
+                    selected={{ from: dateRange.from, to: dateRange.to }}
+                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                    numberOfMonths={2}
+                    initialFocus
+                    className={cn('p-3 pointer-events-auto')}
+                  />
+                </PopoverContent>
+              </Popover>
+              {(dateRange.from || dateRange.to) && (
+                <Button variant="ghost" size="icon" onClick={clearDateFilter}>
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+          {(dateRange.from || dateRange.to) && (
+            <div className="mt-4 flex flex-wrap gap-4 text-sm">
+              <div className="rounded-lg bg-muted px-3 py-2">
+                <span className="text-muted-foreground">Filtered Total: </span>
+                <span className="font-semibold text-success">{formatCurrency(filteredStats.totalCommission)}</span>
+              </div>
+              <div className="rounded-lg bg-muted px-3 py-2">
+                <span className="text-muted-foreground">Activated USD: </span>
+                <span className="font-semibold">{formatCurrency(filteredStats.totalActivatedUsd)}</span>
+              </div>
+              <div className="rounded-lg bg-muted px-3 py-2">
+                <span className="text-muted-foreground">Records: </span>
+                <span className="font-semibold">{filteredStats.count}</span>
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex h-32 items-center justify-center">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
-          ) : commissions && commissions.length > 0 ? (
+          ) : filteredCommissions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -155,7 +256,7 @@ const SalesRepCommissions: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {commissions.map((commission) => (
+                {filteredCommissions.map((commission) => (
                   <TableRow key={commission.id}>
                     <TableCell>
                       {format(new Date(commission.activated_at), 'MMM d, yyyy')}
@@ -187,9 +288,13 @@ const SalesRepCommissions: React.FC = () => {
           ) : (
             <div className="py-12 text-center">
               <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-4 text-lg font-medium text-muted-foreground">No commissions yet</p>
+              <p className="mt-4 text-lg font-medium text-muted-foreground">
+                {dateRange.from || dateRange.to ? 'No commissions in this date range' : 'No commissions yet'}
+              </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Your commissions will appear here when your merchants activate BitCards.
+                {dateRange.from || dateRange.to
+                  ? 'Try selecting a different date range'
+                  : 'Your commissions will appear here when your merchants activate BitCards.'}
               </p>
             </div>
           )}
