@@ -326,7 +326,7 @@ const MerchantCashierPOS: React.FC = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
-                <span>BTC Value</span>
+                <span>Voucher Value</span>
                 <span>{formatCurrency(baseAmount)}</span>
               </div>
               {paymentMethod === 'CARD' && currentFees.squareProcessing > 0 && (
