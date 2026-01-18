@@ -71,6 +71,7 @@ import MerchantOrderCards from "./pages/merchant/admin/MerchantOrderCards";
 import MerchantOrders from "./pages/merchant/admin/MerchantOrders";
 import MerchantCashiers from "./pages/merchant/admin/MerchantCashiers";
 import MerchantSettings from "./pages/merchant/admin/MerchantSettings";
+import MerchantCommissions from "./pages/merchant/admin/MerchantCommissions";
 import MerchantCashierPOS from "./pages/merchant/MerchantCashierPOS";
 import MerchantActivationHistory from "./pages/merchant/MerchantActivationHistory";
 
@@ -135,6 +136,7 @@ const App = () => (
                 <Routes>
                   <Route path="reset-password" element={<MerchantResetPassword />} />
                   <Route path="admin/dashboard" element={<MerchantProtectedRoute requireAdmin><MerchantAdminDashboard /></MerchantProtectedRoute>} />
+                  <Route path="admin/commissions" element={<MerchantProtectedRoute requireAdmin><MerchantCommissions /></MerchantProtectedRoute>} />
                   <Route path="admin/add-balance" element={<MerchantProtectedRoute requireAdmin><MerchantAddBalance /></MerchantProtectedRoute>} />
                   <Route path="admin/order-cards" element={<MerchantProtectedRoute requireAdmin><MerchantOrderCards /></MerchantProtectedRoute>} />
                   <Route path="admin/orders" element={<MerchantProtectedRoute requireAdmin><MerchantOrders /></MerchantProtectedRoute>} />

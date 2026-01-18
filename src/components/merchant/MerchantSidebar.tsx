@@ -42,6 +42,7 @@ import {
   Lock,
   Loader2,
   LockOpen,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -99,6 +100,7 @@ export const MerchantSidebar: React.FC = () => {
 
   const adminLinks = [
     { to: '/merchant/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/merchant/admin/commissions', icon: TrendingUp, label: 'Commissions' },
     { to: '/merchant/admin/add-balance', icon: DollarSign, label: 'Add Balance' },
     { to: '/merchant/admin/order-cards', icon: Package, label: 'Order Cards' },
     { to: '/merchant/admin/orders', icon: CreditCard, label: 'Orders' },

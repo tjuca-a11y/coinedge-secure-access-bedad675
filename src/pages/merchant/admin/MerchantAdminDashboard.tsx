@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MerchantLayout } from '@/components/merchant/MerchantLayout';
 import { useMerchantAuth } from '@/contexts/MerchantAuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -17,9 +17,11 @@ import {
   Wallet,
 } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
+import { DailyEarningsBanner } from '@/components/merchant/DailyEarningsBanner';
 
 const MerchantAdminDashboard: React.FC = () => {
   const { merchant, wallet } = useMerchantAuth();
+  const [showEarningsBanner, setShowEarningsBanner] = useState(true);
 
   // Fetch recent ledger entries
   const { data: ledgerEntries } = useQuery({
@@ -123,6 +125,11 @@ const MerchantAdminDashboard: React.FC = () => {
 
   return (
     <MerchantLayout title="Dashboard" subtitle="Overview of your merchant account">
+      {/* Daily Earnings Notification */}
+      {showEarningsBanner && (
+        <DailyEarningsBanner onDismiss={() => setShowEarningsBanner(false)} />
+      )}
+
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
