@@ -9,6 +9,7 @@ import {
   Users,
   TrendingUp,
   AlertCircle,
+  Wallet,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -82,6 +83,12 @@ const AdminDashboard: React.FC = () => {
       value: stats?.pendingApprovalCount || 0,
       icon: AlertCircle,
     },
+    {
+      title: 'Merchant Cash Credit Liability',
+      value: formatCurrency(stats?.totalMerchantCashCredit || 0),
+      icon: Wallet,
+      highlight: true,
+    },
   ];
 
   return (
@@ -107,16 +114,19 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 md:grid-cols-4">
         {summaryCards.map((card) => (
-          <Card key={card.title}>
+          <Card 
+            key={card.title}
+            className={card.highlight ? 'border-amber-500/20 bg-amber-500/5' : ''}
+          >
             <CardContent className="flex items-center gap-4 pt-6">
-              <div className="rounded-lg bg-muted p-3">
-                <card.icon className="h-6 w-6 text-muted-foreground" />
+              <div className={`rounded-lg p-3 ${card.highlight ? 'bg-amber-500/10' : 'bg-muted'}`}>
+                <card.icon className={`h-6 w-6 ${card.highlight ? 'text-amber-600' : 'text-muted-foreground'}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">{card.title}</p>
-                <p className="text-2xl font-bold">{card.value}</p>
+                <p className={`text-sm ${card.highlight ? 'text-amber-600' : 'text-muted-foreground'}`}>{card.title}</p>
+                <p className={`text-2xl font-bold ${card.highlight ? 'text-amber-600' : ''}`}>{card.value}</p>
               </div>
             </CardContent>
           </Card>

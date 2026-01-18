@@ -10,6 +10,7 @@ interface DashboardStats {
   merchantCount: number;
   salesRepCount: number;
   pendingApprovalCount: number;
+  totalMerchantCashCredit: number;
 }
 
 export const useAdminStats = () => {
@@ -45,6 +46,15 @@ export const useAdminStats = () => {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'approved');
 
+      // Fetch total merchant cash credit liability
+      const { data: wallets, error: walletsError } = await supabase
+        .from('merchant_wallets')
+        .select('cash_credit_balance');
+      
+      if (walletsError) throw walletsError;
+      
+      const totalMerchantCashCredit = wallets?.reduce((sum, w) => sum + Number(w.cash_credit_balance || 0), 0) || 0;
+
       return {
         totalBitcardsActivated: activatedBitcards.length,
         totalActivatedUsd,
@@ -54,6 +64,7 @@ export const useAdminStats = () => {
         merchantCount: merchantCount || 0,
         salesRepCount: salesRepCount || 0,
         pendingApprovalCount: pendingApprovalCount || 0,
+        totalMerchantCashCredit,
       };
     },
   });

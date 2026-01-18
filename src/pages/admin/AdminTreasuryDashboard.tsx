@@ -46,6 +46,7 @@ import {
   Clock,
   XCircle,
   Shield,
+  Store,
 } from 'lucide-react';
 import {
   useTreasuryWallet,
@@ -320,7 +321,7 @@ const AdminTreasuryDashboard: React.FC = () => {
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6 mb-6">
         <Card className="border-orange-500/20 bg-orange-500/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-orange-600">BTC Eligible</CardTitle>
@@ -362,6 +363,21 @@ const AdminTreasuryDashboard: React.FC = () => {
             </div>
             <p className="text-xs text-muted-foreground">
               Operational funds
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-amber-600">Merchant Cash Credit</CardTitle>
+            <Store className="h-5 w-5 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">
+              {formatUsdc(overview?.merchantCashCredit || 0)}
+            </div>
+            <p className="text-xs text-amber-600/80">
+              Liability owed
             </p>
           </CardContent>
         </Card>

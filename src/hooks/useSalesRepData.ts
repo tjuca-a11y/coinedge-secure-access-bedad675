@@ -127,12 +127,22 @@ export const useSalesRepMerchantDetail = (merchantId: string) => {
 
       if (invitesError) throw invitesError;
 
+      // Fetch merchant wallet for cash credit balance
+      const { data: wallet, error: walletError } = await supabase
+        .from('merchant_wallets')
+        .select('cash_credit_balance')
+        .eq('merchant_id', merchantId)
+        .maybeSingle();
+
+      if (walletError) throw walletError;
+
       return {
         merchant,
         bitcards: bitcards || [],
         commissions: commissions || [],
         timeline: timeline || [],
         invites: invites || [],
+        cashCreditBalance: wallet?.cash_credit_balance || 0,
       };
     },
     enabled: !!salesRep && !!merchantId,

@@ -25,6 +25,7 @@ import {
   Clock,
   Send,
   RefreshCw,
+  Wallet,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -137,7 +138,7 @@ const SalesRepMerchantDetail: React.FC = () => {
     );
   }
 
-  const { merchant, bitcards, commissions, timeline, invites } = data;
+  const { merchant, bitcards, commissions, timeline, invites, cashCreditBalance } = data;
 
   const totalCommission = commissions.reduce((sum, c) => sum + Number(c.rep_commission_usd), 0);
   const totalActivatedUsd = bitcards
@@ -222,7 +223,7 @@ const SalesRepMerchantDetail: React.FC = () => {
             <CardTitle>Performance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-4 gap-4 mb-6">
               <div className="rounded-lg border p-4 text-center">
                 <CreditCard className="mx-auto h-6 w-6 text-primary mb-2" />
                 <p className="text-2xl font-bold">{bitcards.filter((b) => b.status === 'active').length}</p>
@@ -237,6 +238,11 @@ const SalesRepMerchantDetail: React.FC = () => {
                 <DollarSign className="mx-auto h-6 w-6 text-success mb-2" />
                 <p className="text-2xl font-bold text-success">{formatCurrency(totalCommission)}</p>
                 <p className="text-xs text-muted-foreground">Your Commission</p>
+              </div>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-center">
+                <Wallet className="mx-auto h-6 w-6 text-amber-600 mb-2" />
+                <p className="text-2xl font-bold text-amber-600">{formatCurrency(cashCreditBalance)}</p>
+                <p className="text-xs text-amber-600/80">Cash Credit</p>
               </div>
             </div>
 
