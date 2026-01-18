@@ -92,7 +92,7 @@ export default function AdminMerchantDetail() {
       </Button>
 
       {/* Stats Cards */}
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
+      <div className="mb-6 grid gap-4 md:grid-cols-5">
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
@@ -123,6 +123,17 @@ export default function AdminMerchantDetail() {
             <div>
               <p className="text-sm text-muted-foreground">Wallet Balance</p>
               <p className="text-2xl font-bold">${stats.walletBalance.toFixed(2)}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+              <Wallet className="h-5 w-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-sm text-amber-600">Cash Credit</p>
+              <p className="text-2xl font-bold text-amber-600">${stats.cashCreditBalance.toFixed(2)}</p>
             </div>
           </CardContent>
         </Card>

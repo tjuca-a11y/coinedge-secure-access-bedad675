@@ -109,6 +109,7 @@ export const useAdminMerchantDetail = (merchantId: string) => {
           totalActivatedUsd,
           totalActivations,
           walletBalance: wallet?.balance_usd || 0,
+          cashCreditBalance: wallet?.cash_credit_balance || 0,
         },
       };
     },

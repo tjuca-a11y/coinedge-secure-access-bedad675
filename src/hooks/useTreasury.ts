@@ -547,6 +547,13 @@ export const useTreasuryOverview = () => {
         .select('*', { count: 'exact', head: true })
         .in('status', ['PENDING', 'PROCESSING', 'ACH_INITIATED']);
 
+      // Get total merchant cash credit liability
+      const { data: wallets } = await supabase
+        .from('merchant_wallets')
+        .select('cash_credit_balance');
+      
+      const merchantCashCredit = wallets?.reduce((sum, w) => sum + Number(w.cash_credit_balance || 0), 0) || 0;
+
       return {
         btc: {
           total: Number(btc?.total_btc || 0),
@@ -559,6 +566,7 @@ export const useTreasuryOverview = () => {
         },
         companyUsdc: Number(companyUsdc?.balance_usdc || 0),
         pendingCashouts: pendingCashouts || 0,
+        merchantCashCredit,
       };
     },
     refetchInterval: 30000,
