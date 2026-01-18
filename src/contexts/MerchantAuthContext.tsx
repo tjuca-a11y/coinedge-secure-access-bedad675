@@ -24,12 +24,15 @@ interface Merchant {
   merchant_id: string;
   business_name: string;
   status: string;
+  is_initially_funded: boolean;
+  rep_id: string | null;
 }
 
 interface MerchantWallet {
   id: string;
   merchant_id: string;
   balance_usd: number;
+  cash_credit_balance: number;
   updated_at: string;
 }
 
@@ -74,7 +77,7 @@ export const MerchantAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Fetch merchant data
     const { data: merchantData, error: merchantError } = await supabase
       .from('merchants')
-      .select('id, merchant_id, business_name, status')
+      .select('id, merchant_id, business_name, status, is_initially_funded, rep_id')
       .eq('id', merchantUserData.merchant_id)
       .maybeSingle();
 

@@ -3,23 +3,46 @@ import { MerchantLayout } from '@/components/merchant/MerchantLayout';
 import { useMerchantAuth } from '@/contexts/MerchantAuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Scan, DollarSign, CheckCircle, Loader2, Camera } from 'lucide-react';
+import { Scan, DollarSign, CheckCircle, Loader2, Camera, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PaymentMethodToggle } from '@/components/merchant/PaymentMethodToggle';
+import { CommissionDisplay, CommissionSuccess } from '@/components/merchant/CommissionDisplay';
+import { useFeeCalculation, formatCurrency, type PaymentMethod } from '@/hooks/useFeeCalculation';
+import { useSquarePayment } from '@/hooks/useSquarePayment';
 
 const MerchantCashierPOS: React.FC = () => {
   const { merchant, merchantUser, wallet, refreshMerchantData } = useMerchantAuth();
   const [amount, setAmount] = useState('');
   const [bitcardId, setBitcardId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CARD');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [activationSuccess, setActivationSuccess] = useState(false);
+  const [earnedCommission, setEarnedCommission] = useState(0);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const baseAmount = parseFloat(amount) || 0;
+  const cashBalance = wallet?.cash_credit_balance ?? 0;
+  
+  const cardFees = useFeeCalculation(baseAmount, 'CARD');
+  const cashFees = useFeeCalculation(baseAmount, 'CASH');
+  const currentFees = paymentMethod === 'CASH' ? cashFees : cardFees;
+
+  const squarePayment = useSquarePayment({
+    onSuccess: () => {
+      // Payment completed, finalize activation
+      finalizeActivation();
+    },
+    onError: (error) => {
+      toast({ title: 'Payment Failed', description: error, variant: 'destructive' });
+    },
+  });
 
   useEffect(() => {
     return () => {
@@ -30,12 +53,9 @@ const MerchantCashierPOS: React.FC = () => {
   }, []);
 
   const extractBitcardId = (payload: string): string | null => {
-    // Plain format: bitcard-1234
     if (payload.startsWith('bitcard-')) return payload;
-    // URL format: contains card=bitcard-1234
     const urlMatch = payload.match(/card=(bitcard-[a-zA-Z0-9-]+)/);
     if (urlMatch) return urlMatch[1];
-    // JSON format: {"bitcard_id":"bitcard-1234"}
     try {
       const json = JSON.parse(payload);
       if (json.bitcard_id) return json.bitcard_id;
@@ -76,13 +96,13 @@ const MerchantCashierPOS: React.FC = () => {
     setScannerOpen(false);
   };
 
-  const activateMutation = useMutation({
-    mutationFn: async () => {
-      if (!merchant?.id || !merchantUser?.id) throw new Error('Not authenticated');
-      const amountNum = parseFloat(amount);
-      if (amountNum <= 0) throw new Error('Invalid amount');
-      if ((wallet?.balance_usd ?? 0) < amountNum) throw new Error('Insufficient balance');
-
+  const finalizeActivation = async () => {
+    if (!merchant?.id || !merchantUser?.id) return;
+    
+    const amountNum = parseFloat(amount);
+    const commission = currentFees.merchantFee;
+    
+    try {
       // Get bitcard
       const { data: card, error: cardError } = await supabase
         .from('bitcards')
@@ -93,9 +113,8 @@ const MerchantCashierPOS: React.FC = () => {
 
       if (cardError || !card) throw new Error('Card not found');
       if (card.status !== 'issued') throw new Error('Card already activated or invalid');
-      if (card.usd_value !== null) throw new Error('Card already has a value');
 
-      // Create activation event
+      // Create activation event with payment info
       const { data: event, error: eventError } = await supabase
         .from('bitcard_activation_events')
         .insert({
@@ -103,13 +122,16 @@ const MerchantCashierPOS: React.FC = () => {
           bitcard_id: card.id,
           usd_value: amountNum,
           activated_by_merchant_user_id: merchantUser.id,
+          payment_method: paymentMethod,
+          customer_amount_paid: currentFees.customerPays,
+          merchant_commission_usd: commission,
         })
         .select()
         .single();
 
       if (eventError) throw eventError;
 
-      // Update bitcard
+      // Update bitcard status
       await supabase
         .from('bitcards')
         .update({
@@ -120,44 +142,112 @@ const MerchantCashierPOS: React.FC = () => {
         })
         .eq('id', card.id);
 
-      // Create ledger entry (trigger updates wallet)
+      // Create ledger entries based on payment method
+      if (paymentMethod === 'CASH') {
+        // Deduct base amount from cash credit
+        await supabase.from('merchant_wallet_ledger').insert({
+          merchant_id: merchant.id,
+          type: 'CASH_SALE_DEBIT',
+          amount_usd: -amountNum,
+          reference: event.id,
+          created_by_merchant_user_id: merchantUser.id,
+        });
+      }
+
+      // Credit merchant commission
+      const commissionType = paymentMethod === 'CASH' ? 'MERCHANT_COMMISSION_CASH' : 'MERCHANT_COMMISSION_CARD';
       await supabase.from('merchant_wallet_ledger').insert({
         merchant_id: merchant.id,
-        type: 'ACTIVATION_DEBIT',
-        amount_usd: -amountNum,
+        type: commissionType,
+        amount_usd: commission,
         reference: event.id,
         created_by_merchant_user_id: merchantUser.id,
       });
 
-      return { amountNum };
-    },
-    onSuccess: async ({ amountNum }) => {
+      setEarnedCommission(commission);
       setActivationSuccess(true);
       await refreshMerchantData();
       queryClient.invalidateQueries({ queryKey: ['merchant-ledger'] });
-      toast({ title: 'Card Activated!', description: `$${amountNum.toFixed(2)} loaded` });
-    },
-    onError: (error: Error) => {
-      toast({ title: 'Activation Failed', description: error.message || 'Card not found or invalid', variant: 'destructive' });
-    },
-  });
+      toast({ title: 'Sale Complete!', description: `You earned ${formatCurrency(commission)}` });
+    } catch (error) {
+      console.error('Activation error:', error);
+      toast({ 
+        title: 'Activation Failed', 
+        description: error instanceof Error ? error.message : 'Unknown error', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const handleActivate = async () => {
+    if (!merchant?.id || !merchantUser?.id) {
+      toast({ title: 'Error', description: 'Not authenticated', variant: 'destructive' });
+      return;
+    }
+
+    const amountNum = parseFloat(amount);
+    if (amountNum <= 0) {
+      toast({ title: 'Error', description: 'Invalid amount', variant: 'destructive' });
+      return;
+    }
+
+    if (paymentMethod === 'CASH') {
+      if (cashBalance < amountNum) {
+        toast({ title: 'Error', description: 'Insufficient cash credit', variant: 'destructive' });
+        return;
+      }
+      // Direct activation for cash
+      await finalizeActivation();
+    } else {
+      // Card payment - initiate Square
+      await squarePayment.createPayment(amountNum, bitcardId);
+    }
+  };
 
   const handleReset = () => {
     setActivationSuccess(false);
     setAmount('');
     setBitcardId('');
+    setPaymentMethod('CARD');
+    setEarnedCommission(0);
+    squarePayment.reset();
   };
 
+  // Success screen
   if (activationSuccess) {
     return (
       <MerchantLayout title="POS Terminal">
         <Card className="mx-auto max-w-md">
           <CardContent className="flex flex-col items-center py-12">
-            <CheckCircle className="h-20 w-20 text-green-500" />
-            <h2 className="mt-4 text-3xl font-bold">Activated!</h2>
-            <p className="mt-2 text-xl">${parseFloat(amount).toFixed(2)} loaded</p>
+            <CheckCircle className="h-20 w-20 text-green-500 mb-6" />
+            <h2 className="text-3xl font-bold mb-6">Sale Complete!</h2>
+            <CommissionSuccess commission={earnedCommission} paymentMethod={paymentMethod} />
             <Button onClick={handleReset} size="lg" className="mt-8 w-full">
-              Activate Another Card
+              New Sale
+            </Button>
+          </CardContent>
+        </Card>
+      </MerchantLayout>
+    );
+  }
+
+  // Payment in progress
+  if (squarePayment.status !== 'IDLE' && squarePayment.status !== 'FAILED') {
+    return (
+      <MerchantLayout title="POS Terminal">
+        <Card className="mx-auto max-w-md">
+          <CardContent className="flex flex-col items-center py-12">
+            <Loader2 className="h-16 w-16 animate-spin text-primary mb-6" />
+            <h2 className="text-2xl font-bold mb-2">
+              {squarePayment.status === 'CREATING' && 'Starting payment...'}
+              {squarePayment.status === 'PENDING' && 'Waiting for customer tap...'}
+              {squarePayment.status === 'POLLING' && 'Waiting for customer tap...'}
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              Customer pays: {formatCurrency(squarePayment.customerPays || currentFees.customerPays)}
+            </p>
+            <Button variant="outline" onClick={() => { squarePayment.cancelPayment(); handleReset(); }}>
+              Cancel
             </Button>
           </CardContent>
         </Card>
@@ -166,11 +256,25 @@ const MerchantCashierPOS: React.FC = () => {
   }
 
   return (
-    <MerchantLayout title="POS Terminal" subtitle={`Balance: $${wallet?.balance_usd?.toFixed(2) ?? '0.00'}`}>
-      <div className="mx-auto max-w-md space-y-6">
+    <MerchantLayout title="POS Terminal">
+      <div className="mx-auto max-w-md space-y-4">
+        {/* Cash Credit Balance */}
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              <span className="font-medium">Cash Credit</span>
+            </div>
+            <span className="text-lg font-bold">{formatCurrency(cashBalance)}</span>
+          </CardContent>
+        </Card>
+
         {/* Amount Input */}
         <Card>
-          <CardContent className="p-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">BTC Amount</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <DollarSign className="h-8 w-8 text-primary" />
               <Input
@@ -183,8 +287,7 @@ const MerchantCashierPOS: React.FC = () => {
                 step="0.01"
               />
             </div>
-            {/* Quick Amount Presets */}
-            <div className="mt-4 grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {[25, 50, 100, 250].map((preset) => (
                 <Button
                   key={preset}
@@ -197,13 +300,12 @@ const MerchantCashierPOS: React.FC = () => {
                 </Button>
               ))}
             </div>
-            <p className="mt-3 text-center text-sm text-muted-foreground">Select or enter card value</p>
           </CardContent>
         </Card>
 
-        {/* QR Scanner */}
+        {/* Card ID Input */}
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <Scan className="h-6 w-6 text-primary" />
               <Input
@@ -219,15 +321,67 @@ const MerchantCashierPOS: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Activate Button */}
+        {/* Customer Pays */}
+        {baseAmount > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
+                <span>BTC Value</span>
+                <span>{formatCurrency(baseAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
+                <span>Service Fee (13.75%)</span>
+                <span>{formatCurrency(currentFees.totalFee)}</span>
+              </div>
+              <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
+                <span>Customer Pays</span>
+                <span>{formatCurrency(currentFees.customerPays)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Commission Display */}
+        {baseAmount > 0 && (
+          <CommissionDisplay 
+            commission={currentFees.merchantFee} 
+            paymentMethod={paymentMethod} 
+          />
+        )}
+
+        {/* Payment Method Selection */}
+        {baseAmount > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Payment Method</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PaymentMethodToggle
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                cashBalance={cashBalance}
+                baseAmount={baseAmount}
+                cardCommission={cardFees.merchantFee}
+                cashCommission={cashFees.merchantFee}
+                disabled={squarePayment.status !== 'IDLE'}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Complete Sale Button */}
         <Button
-          onClick={() => activateMutation.mutate()}
-          disabled={!amount || !bitcardId || activateMutation.isPending}
+          onClick={handleActivate}
+          disabled={!amount || !bitcardId || squarePayment.status !== 'IDLE'}
           size="lg"
           className="h-16 w-full text-xl"
         >
-          {activateMutation.isPending ? <Loader2 className="h-6 w-6 animate-spin" /> : 'Activate Card'}
+          {paymentMethod === 'CASH' ? 'Complete Cash Sale' : 'Start Card Payment'}
         </Button>
+
+        {squarePayment.error && (
+          <p className="text-center text-sm text-destructive">{squarePayment.error}</p>
+        )}
       </div>
 
       {/* Scanner Dialog */}
