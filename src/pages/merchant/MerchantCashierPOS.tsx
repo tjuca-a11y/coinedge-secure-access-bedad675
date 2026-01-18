@@ -331,7 +331,7 @@ const MerchantCashierPOS: React.FC = () => {
               </div>
               {paymentMethod === 'CARD' && currentFees.squareProcessing > 0 && (
                 <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
-                  <span>Square Processing (3%)</span>
+                  <span>Square Processing (2.6% + 15¢)</span>
                   <span>{formatCurrency(currentFees.squareProcessing)}</span>
                 </div>
               )}

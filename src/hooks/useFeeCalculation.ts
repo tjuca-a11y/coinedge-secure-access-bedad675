@@ -28,7 +28,8 @@ export interface FeeBreakdown extends PosFeeBreakdown, RedemptionFeeBreakdown {
 const POS_FEE_RATES = {
   MERCHANT_CARD: 0.02,     // 2%
   MERCHANT_CASH: 0.05,     // 5%
-  SQUARE_PROCESSING: 0.03, // 3% (card only)
+  SQUARE_PROCESSING_RATE: 0.026, // 2.6% (card only)
+  SQUARE_PROCESSING_FIXED: 0.15, // $0.15 per transaction (card only)
 };
 
 // Redemption fee rates (deducted when claiming BTC)
@@ -38,7 +39,7 @@ const REDEMPTION_FEE_RATES = {
   COINEDGE: 0.0375,       // 3.75%
 };
 
-export const POS_FEE_RATE_CARD = POS_FEE_RATES.MERCHANT_CARD + POS_FEE_RATES.SQUARE_PROCESSING; // 5%
+export const POS_FEE_RATE_CARD = POS_FEE_RATES.MERCHANT_CARD + POS_FEE_RATES.SQUARE_PROCESSING_RATE; // ~4.6% + $0.15
 export const POS_FEE_RATE_CASH = POS_FEE_RATES.MERCHANT_CASH; // 5%
 export const REDEMPTION_FEE_RATE = REDEMPTION_FEE_RATES.SALES_REP + REDEMPTION_FEE_RATES.VOLATILITY + REDEMPTION_FEE_RATES.COINEDGE; // 8.75%
 
@@ -51,9 +52,9 @@ export function calculatePosFees(baseAmount: number, paymentMethod: PaymentMetho
     ? baseAmount * POS_FEE_RATES.MERCHANT_CASH 
     : baseAmount * POS_FEE_RATES.MERCHANT_CARD;
   
-  // Square charges 3% processing on card payments (not us)
+  // Square charges 2.6% + $0.15 processing on card payments (not us)
   const squareProcessing = paymentMethod === 'CARD' 
-    ? baseAmount * POS_FEE_RATES.SQUARE_PROCESSING 
+    ? (baseAmount * POS_FEE_RATES.SQUARE_PROCESSING_RATE) + POS_FEE_RATES.SQUARE_PROCESSING_FIXED
     : 0;
   
   // For card: customer pays base + 3% Square processing
