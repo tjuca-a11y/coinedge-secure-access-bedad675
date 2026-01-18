@@ -4,7 +4,6 @@ import { useMerchantAuth } from '@/contexts/MerchantAuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import {
   DollarSign,
@@ -14,6 +13,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Activity,
+  TrendingUp,
+  Wallet,
 } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
 
@@ -37,18 +38,18 @@ const MerchantAdminDashboard: React.FC = () => {
     enabled: !!merchant?.id,
   });
 
-  // Fetch activation stats
+  // Fetch activation stats with commission totals
   const { data: activationStats } = useQuery({
     queryKey: ['activation-stats', merchant?.id],
     queryFn: async () => {
-      if (!merchant?.id) return { today: 0, week: 0, month: 0 };
+      if (!merchant?.id) return { today: 0, week: 0, month: 0, totalCommission: 0, cardCommission: 0, cashCommission: 0 };
 
       const now = new Date();
       const todayStart = startOfDay(now).toISOString();
       const weekStart = startOfDay(subDays(now, 7)).toISOString();
       const monthStart = startOfDay(subDays(now, 30)).toISOString();
 
-      const [todayRes, weekRes, monthRes] = await Promise.all([
+      const [todayRes, weekRes, monthRes, commissionsRes] = await Promise.all([
         supabase
           .from('bitcard_activation_events')
           .select('id', { count: 'exact', head: true })
@@ -64,12 +65,36 @@ const MerchantAdminDashboard: React.FC = () => {
           .select('id', { count: 'exact', head: true })
           .eq('merchant_id', merchant.id)
           .gte('created_at', monthStart),
+        supabase
+          .from('bitcard_activation_events')
+          .select('merchant_commission_usd, payment_method')
+          .eq('merchant_id', merchant.id),
       ]);
+
+      // Calculate commission totals
+      let totalCommission = 0;
+      let cardCommission = 0;
+      let cashCommission = 0;
+      
+      if (commissionsRes.data) {
+        for (const event of commissionsRes.data) {
+          const commission = event.merchant_commission_usd || 0;
+          totalCommission += commission;
+          if (event.payment_method === 'CARD') {
+            cardCommission += commission;
+          } else if (event.payment_method === 'CASH') {
+            cashCommission += commission;
+          }
+        }
+      }
 
       return {
         today: todayRes.count ?? 0,
         week: weekRes.count ?? 0,
         month: monthRes.count ?? 0,
+        totalCommission,
+        cardCommission,
+        cashCommission,
       };
     },
     enabled: !!merchant?.id,
@@ -83,6 +108,14 @@ const MerchantAdminDashboard: React.FC = () => {
         return { label: 'Card Activation', icon: ArrowDownRight, color: 'text-red-500' };
       case 'ADJUSTMENT':
         return { label: 'Adjustment', icon: Activity, color: 'text-blue-500' };
+      case 'MERCHANT_COMMISSION_CARD':
+        return { label: 'Card Sale Commission', icon: TrendingUp, color: 'text-green-500' };
+      case 'MERCHANT_COMMISSION_CASH':
+        return { label: 'Cash Sale Commission', icon: TrendingUp, color: 'text-green-500' };
+      case 'CASH_SALE_DEBIT':
+        return { label: 'Cash Sale', icon: ArrowDownRight, color: 'text-orange-500' };
+      case 'INITIAL_FUNDING':
+        return { label: 'Initial Funding', icon: ArrowUpRight, color: 'text-green-500' };
       default:
         return { label: type, icon: Activity, color: 'text-muted-foreground' };
     }
@@ -92,19 +125,61 @@ const MerchantAdminDashboard: React.FC = () => {
     <MerchantLayout title="Dashboard" subtitle="Overview of your merchant account">
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Commissions</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ${activationStats?.totalCommission?.toFixed(2) ?? '0.00'}
+            </div>
+            <p className="text-xs text-muted-foreground">Lifetime earnings</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
+            <CardTitle className="text-sm font-medium">Cash Credit</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${wallet?.cash_credit_balance?.toFixed(2) ?? '0.00'}
+            </div>
+            <p className="text-xs text-muted-foreground">For cash sales (5% commission)</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Card Commissions</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${activationStats?.cardCommission?.toFixed(2) ?? '0.00'}
+            </div>
+            <p className="text-xs text-muted-foreground">2% on card sales</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cash Commissions</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${wallet?.balance_usd?.toFixed(2) ?? '0.00'}
+              ${activationStats?.cashCommission?.toFixed(2) ?? '0.00'}
             </div>
-            <p className="text-xs text-muted-foreground">Available for card activations</p>
+            <p className="text-xs text-muted-foreground">5% on cash sales</p>
           </CardContent>
         </Card>
+      </div>
 
+      {/* Activation Stats */}
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Activations</CardTitle>
@@ -112,7 +187,6 @@ const MerchantAdminDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activationStats?.today ?? 0}</div>
-            <p className="text-xs text-muted-foreground">Cards activated today</p>
           </CardContent>
         </Card>
 
@@ -123,7 +197,6 @@ const MerchantAdminDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activationStats?.week ?? 0}</div>
-            <p className="text-xs text-muted-foreground">Last 7 days</p>
           </CardContent>
         </Card>
 
@@ -134,7 +207,6 @@ const MerchantAdminDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activationStats?.month ?? 0}</div>
-            <p className="text-xs text-muted-foreground">Last 30 days</p>
           </CardContent>
         </Card>
       </div>
@@ -149,7 +221,7 @@ const MerchantAdminDashboard: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-semibold">Add Balance</h3>
-                <p className="text-sm text-muted-foreground">Top up your account</p>
+                <p className="text-sm text-muted-foreground">Top up your cash credit</p>
               </div>
             </CardContent>
           </Card>
