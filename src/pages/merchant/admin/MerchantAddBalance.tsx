@@ -15,13 +15,10 @@ import { formatCurrency } from '@/hooks/useFeeCalculation';
 
 const INITIAL_FUNDING_AMOUNT = 300;
 const INITIAL_CASH_CREDIT = 250;
-const INITIAL_SALES_REP_BONUS = 50;
-
-const presetAmounts = [100, 250, 500, 1000];
+const SETUP_FEE = 50;
 
 const MerchantAddBalance: React.FC = () => {
   const { merchant, merchantUser, refreshMerchantData, wallet } = useMerchantAuth();
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [addedAmount, setAddedAmount] = useState(0);
@@ -29,7 +26,7 @@ const MerchantAddBalance: React.FC = () => {
   const queryClient = useQueryClient();
 
   const isInitialFunding = !merchant?.is_initially_funded;
-  const amount = isInitialFunding ? INITIAL_FUNDING_AMOUNT : (selectedAmount ?? (customAmount ? parseFloat(customAmount) : 0));
+  const amount = isInitialFunding ? INITIAL_FUNDING_AMOUNT : (customAmount ? parseFloat(customAmount) : 0);
 
   const squarePayment = useSquarePayment({
     onSuccess: async () => {
@@ -71,7 +68,7 @@ const MerchantAddBalance: React.FC = () => {
           })
           .eq('merchant_id', merchant.id);
 
-        // Credit sales rep bonus
+        // Credit sales rep bonus from setup fee
         if (merchant.rep_id) {
           await supabase.from('commission_ledger').insert({
             commission_id: `bonus-${Date.now()}`,
@@ -79,7 +76,7 @@ const MerchantAddBalance: React.FC = () => {
             merchant_id: merchant.id,
             card_value_usd: 0,
             activation_fee_usd: 0,
-            rep_commission_usd: INITIAL_SALES_REP_BONUS,
+            rep_commission_usd: SETUP_FEE,
             coinedge_revenue_usd: 0,
             status: 'accrued',
           });
@@ -170,7 +167,6 @@ const MerchantAddBalance: React.FC = () => {
 
   const handleReset = () => {
     setPaymentSuccess(false);
-    setSelectedAmount(null);
     setCustomAmount('');
     setAddedAmount(0);
     squarePayment.reset();
@@ -236,8 +232,8 @@ const MerchantAddBalance: React.FC = () => {
                     <span>{formatCurrency(INITIAL_CASH_CREDIT)}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Processing</span>
-                    <span>{formatCurrency(INITIAL_SALES_REP_BONUS)}</span>
+                    <span>One-Time Setup Fee</span>
+                    <span>{formatCurrency(SETUP_FEE)}</span>
                   </div>
                 </div>
               </div>
@@ -277,7 +273,9 @@ const MerchantAddBalance: React.FC = () => {
     );
   }
 
-  // Regular Top-up
+  // Regular Top-up - simple custom amount entry
+  const topUpAmount = customAmount ? parseFloat(customAmount) : 0;
+
   return (
     <MerchantLayout title="Add Balance" subtitle="Top up your cash credit">
       <div className="mx-auto max-w-2xl">
@@ -295,57 +293,37 @@ const MerchantAddBalance: React.FC = () => {
           <CardHeader>
             <CardTitle>Add Cash Credit</CardTitle>
             <CardDescription>
-              Cash credit is used for cash sales, earning you 5% commission per sale.
+              Add any amount to your cash credit. Used for cash sales, earning you 5% commission per sale.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Preset Amounts */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {presetAmounts.map((preset) => (
-                <Button
-                  key={preset}
-                  variant={selectedAmount === preset ? 'default' : 'outline'}
-                  onClick={() => {
-                    setSelectedAmount(preset);
-                    setCustomAmount('');
-                  }}
-                  className="h-16 text-lg font-semibold"
-                >
-                  ${preset}
-                </Button>
-              ))}
-            </div>
-
-            {/* Custom Amount */}
+            {/* Amount Input */}
             <div className="space-y-2">
-              <Label htmlFor="customAmount">Or enter custom amount</Label>
+              <Label htmlFor="customAmount">Amount to Add</Label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="customAmount"
                   type="number"
-                  placeholder="0.00"
+                  placeholder="Enter amount"
                   value={customAmount}
-                  onChange={(e) => {
-                    setCustomAmount(e.target.value);
-                    setSelectedAmount(null);
-                  }}
-                  className="pl-10 text-lg"
-                  min="0"
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  className="pl-10 text-lg h-14"
+                  min="1"
                   step="0.01"
                 />
               </div>
             </div>
 
             {/* Summary */}
-            {amount > 0 && (
+            {topUpAmount > 0 && (
               <div className="rounded-lg bg-muted p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Amount to Add</span>
-                  <span className="text-2xl font-bold">{formatCurrency(amount)}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(topUpAmount)}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  New Cash Credit: {formatCurrency((wallet?.cash_credit_balance ?? 0) + amount)}
+                  New Cash Credit: {formatCurrency((wallet?.cash_credit_balance ?? 0) + topUpAmount)}
                 </p>
               </div>
             )}
@@ -353,7 +331,7 @@ const MerchantAddBalance: React.FC = () => {
             {/* Pay Button */}
             <Button
               onClick={handleSubmit}
-              disabled={amount <= 0 || addBalanceMutation.isPending}
+              disabled={topUpAmount <= 0 || addBalanceMutation.isPending}
               className="w-full"
               size="lg"
             >
@@ -363,7 +341,7 @@ const MerchantAddBalance: React.FC = () => {
                   Processing...
                 </>
               ) : (
-                <>Add {formatCurrency(amount)} to Cash Credit</>
+                <>Add {formatCurrency(topUpAmount)} to Cash Credit</>
               )}
             </Button>
 
