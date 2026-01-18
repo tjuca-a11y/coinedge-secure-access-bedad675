@@ -190,7 +190,15 @@ export const useCoinEdgeTransfer = () => {
   }, [signMessage, btcWallet, ethWallet, refreshBalances, getAuthHeader]);
 
   // Validate a voucher code
-  const validateVoucher = useCallback(async (code: string): Promise<{ valid: boolean; amount?: number; asset?: 'BTC' | 'USDC'; error?: string }> => {
+  const validateVoucher = useCallback(async (code: string): Promise<{ 
+    valid: boolean; 
+    amount?: number; 
+    netAmount?: number;
+    redemptionFee?: number;
+    redemptionFeeRate?: number;
+    asset?: 'BTC' | 'USDC'; 
+    error?: string;
+  }> => {
     try {
       const authHeader = await getAuthHeader();
       
@@ -216,7 +224,14 @@ export const useCoinEdgeTransfer = () => {
         return { valid: false, error: result.message || 'Invalid voucher' };
       }
 
-      return { valid: true, amount: result.amount, asset: result.asset };
+      return { 
+        valid: true, 
+        amount: result.amount, 
+        netAmount: result.netAmount,
+        redemptionFee: result.redemptionFee,
+        redemptionFeeRate: result.redemptionFeeRate,
+        asset: result.asset,
+      };
     } catch (error) {
       console.error('Error validating voucher:', error);
       return { valid: false, error: 'Failed to validate voucher' };

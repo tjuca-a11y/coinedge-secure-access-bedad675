@@ -16,6 +16,9 @@ type RedeemStatus = "idle" | "validating" | "redeeming" | "success" | "error";
 interface VoucherResult {
   asset: "BTC" | "USDC";
   amount: string;
+  grossAmount: number;
+  netAmount: number;
+  redemptionFee: number;
   code: string;
   btcPrice?: number;
   txHash?: string;
@@ -29,7 +32,13 @@ const Redeem = () => {
   const [voucherCode, setVoucherCode] = useState("");
   const [status, setStatus] = useState<RedeemStatus>("idle");
   const [result, setResult] = useState<VoucherResult | null>(null);
-  const [validatedVoucher, setValidatedVoucher] = useState<{ amount: number; asset: "BTC" | "USDC" } | null>(null);
+  const [validatedVoucher, setValidatedVoucher] = useState<{ 
+    amount: number; 
+    netAmount: number;
+    redemptionFee: number;
+    redemptionFeeRate: number;
+    asset: "BTC" | "USDC";
+  } | null>(null);
   const [inputMode, setInputMode] = useState<"manual" | "scanner">("manual");
   const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -116,7 +125,13 @@ const Redeem = () => {
     const validation = await validateVoucher(voucherCode.trim());
 
     if (validation.valid && validation.amount && validation.asset) {
-      setValidatedVoucher({ amount: validation.amount, asset: validation.asset });
+      setValidatedVoucher({ 
+        amount: validation.amount, 
+        netAmount: validation.netAmount || validation.amount * 0.9125,
+        redemptionFee: validation.redemptionFee || validation.amount * 0.0875,
+        redemptionFeeRate: validation.redemptionFeeRate || 0.0875,
+        asset: validation.asset,
+      });
       setStatus("idle");
       toast.success("Voucher validated! Review details and click Redeem.");
     } else {
@@ -133,10 +148,10 @@ const Redeem = () => {
 
     setStatus("redeeming");
 
-    // Get quote for redemption
+    // Get quote for redemption (use NET amount for BTC calculation)
     const quote = await getQuote({
       type: "REDEEM",
-      amount: validatedVoucher.amount,
+      amount: validatedVoucher.netAmount,
       asset: validatedVoucher.asset,
     });
 
@@ -156,7 +171,10 @@ const Redeem = () => {
       setStatus("success");
       setResult({
         asset: validatedVoucher.asset,
-        amount: quote.outputAmount?.toFixed(8) || (validatedVoucher.amount / (quote.rate || 95000)).toFixed(8),
+        amount: quote.outputAmount?.toFixed(8) || (validatedVoucher.netAmount / (quote.rate || 95000)).toFixed(8),
+        grossAmount: validatedVoucher.amount,
+        netAmount: validatedVoucher.netAmount,
+        redemptionFee: validatedVoucher.redemptionFee,
         code: voucherCode.toUpperCase(),
         btcPrice: quote.rate,
         txHash: transferResult.txHash,
@@ -219,8 +237,22 @@ const Redeem = () => {
                         +{result.amount} BTC
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        ≈ ${validatedVoucher?.amount.toFixed(2)} USD
+                        ≈ ${result.netAmount.toFixed(2)} USD
                       </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
+                    <div className="flex justify-between mb-1">
+                      <span>Voucher Value:</span>
+                      <span>${result.grossAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span>Redemption Fee (8.75%):</span>
+                      <span>-${result.redemptionFee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium text-foreground pt-1 border-t border-border">
+                      <span>Net Value:</span>
+                      <span>${result.netAmount.toFixed(2)}</span>
                     </div>
                   </div>
                   {result.btcPrice && (
@@ -343,12 +375,20 @@ const Redeem = () => {
                       <span className="text-sm text-muted-foreground">Voucher Code:</span>
                       <span className="font-mono font-bold">{voucherCode.toUpperCase()}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Value:</span>
-                      <span className="font-bold text-lg">${validatedVoucher.amount.toFixed(2)} USD</span>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Voucher Value:</span>
+                      <span>${validatedVoucher.amount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Redemption Fee ({(validatedVoucher.redemptionFeeRate * 100).toFixed(2)}%):</span>
+                      <span className="text-destructive">-${validatedVoucher.redemptionFee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-border">
+                      <span className="text-sm font-medium">You Receive:</span>
+                      <span className="font-bold text-lg text-success">${validatedVoucher.netAmount.toFixed(2)} USD</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Receive:</span>
+                      <span className="text-sm text-muted-foreground">As:</span>
                       <div className="flex items-center gap-2">
                         <Bitcoin className="h-5 w-5 text-btc" />
                         <span className="font-bold text-btc">Bitcoin (BTC)</span>

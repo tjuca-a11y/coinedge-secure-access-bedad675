@@ -152,6 +152,7 @@ export type Database = {
           payment_method:
             | Database["public"]["Enums"]["payment_method_type"]
             | null
+          redemption_fee_rate: number | null
           usd_value: number
         }
         Insert: {
@@ -166,6 +167,7 @@ export type Database = {
           payment_method?:
             | Database["public"]["Enums"]["payment_method_type"]
             | null
+          redemption_fee_rate?: number | null
           usd_value: number
         }
         Update: {
@@ -180,6 +182,7 @@ export type Database = {
           payment_method?:
             | Database["public"]["Enums"]["payment_method_type"]
             | null
+          redemption_fee_rate?: number | null
           usd_value?: number
         }
         Relationships: [
