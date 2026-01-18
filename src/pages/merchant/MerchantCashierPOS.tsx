@@ -11,7 +11,6 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { Scan, DollarSign, CheckCircle, Loader2, Camera, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PaymentMethodToggle } from '@/components/merchant/PaymentMethodToggle';
-import { CommissionDisplay, CommissionSuccess } from '@/components/merchant/CommissionDisplay';
 import { usePosFeeCalculation, formatCurrency, type PaymentMethod } from '@/hooks/useFeeCalculation';
 import { useSquarePayment } from '@/hooks/useSquarePayment';
 
@@ -221,7 +220,7 @@ const MerchantCashierPOS: React.FC = () => {
           <CardContent className="flex flex-col items-center py-12">
             <CheckCircle className="h-20 w-20 text-green-500 mb-6" />
             <h2 className="text-3xl font-bold mb-6">Sale Complete!</h2>
-            <CommissionSuccess commission={earnedCommission} paymentMethod={paymentMethod} />
+            <p className="text-muted-foreground">Card {bitcardId} activated for {formatCurrency(parseFloat(amount) || 0)}</p>
             <Button onClick={handleReset} size="lg" className="mt-8 w-full">
               New Sale
             </Button>
@@ -343,14 +342,6 @@ const MerchantCashierPOS: React.FC = () => {
           </Card>
         )}
 
-        {/* Commission Display */}
-        {baseAmount > 0 && (
-          <CommissionDisplay 
-            commission={currentFees.merchantFee} 
-            paymentMethod={paymentMethod} 
-          />
-        )}
-
         {/* Payment Method Selection */}
         {baseAmount > 0 && (
           <Card>
@@ -363,8 +354,6 @@ const MerchantCashierPOS: React.FC = () => {
                 onChange={setPaymentMethod}
                 cashBalance={cashBalance}
                 baseAmount={baseAmount}
-                cardCommission={cardFees.merchantFee}
-                cashCommission={cashFees.merchantFee}
                 disabled={squarePayment.status !== 'IDLE'}
               />
             </CardContent>
