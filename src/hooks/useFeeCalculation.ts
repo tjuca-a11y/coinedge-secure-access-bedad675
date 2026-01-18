@@ -46,15 +46,19 @@ export const REDEMPTION_FEE_RATE = REDEMPTION_FEE_RATES.SALES_REP + REDEMPTION_F
 export const TOTAL_FEE_RATE = 0.1375; // 13.75%
 
 export function calculatePosFees(baseAmount: number, paymentMethod: PaymentMethod): PosFeeBreakdown {
+  // Merchant commission: 2% for card, 5% for cash
   const merchantFee = paymentMethod === 'CASH' 
     ? baseAmount * POS_FEE_RATES.MERCHANT_CASH 
     : baseAmount * POS_FEE_RATES.MERCHANT_CARD;
   
+  // Square charges 3% processing on card payments (not us)
   const squareProcessing = paymentMethod === 'CARD' 
     ? baseAmount * POS_FEE_RATES.SQUARE_PROCESSING 
     : 0;
   
-  const totalPosFee = merchantFee + squareProcessing;
+  // For card: customer pays base + 3% Square processing
+  // For cash: customer pays base only (merchant keeps 5% from their margin)
+  const totalPosFee = squareProcessing; // Only Square fee is charged to customer
   const customerPays = baseAmount + totalPosFee;
   
   return {
