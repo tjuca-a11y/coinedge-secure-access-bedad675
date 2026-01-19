@@ -10,6 +10,7 @@ import {
   TrendingUp,
   AlertCircle,
   Wallet,
+  PieChart,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -28,6 +29,17 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+// Fee allocation structure
+const FEE_ALLOCATIONS = [
+  { name: 'Sales Rep', rate: 2.00, color: 'text-warning' },
+  { name: 'Merchant', rate: 5.00, color: 'text-success' },
+  { name: 'Volatility Reserve', rate: 3.00, color: 'text-blue-500' },
+  { name: 'Payment Processing', rate: 0.00, color: 'text-muted-foreground' },
+  { name: 'CoinEdge', rate: 3.75, color: 'text-primary' },
+];
+
+const TOTAL_FEE_RATE = FEE_ALLOCATIONS.reduce((sum, fee) => sum + fee.rate, 0);
+
 const AdminDashboard: React.FC = () => {
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: merchants, isLoading: merchantsLoading } = useMerchants();
@@ -44,7 +56,7 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Activation Fees',
       value: formatCurrency(stats?.totalActivationFees || 0),
-      subvalue: '10% of card value',
+      subvalue: `${TOTAL_FEE_RATE.toFixed(2)}% of card value`,
       icon: DollarSign,
       color: 'text-success',
       bgColor: 'bg-success/10',
@@ -52,7 +64,7 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'CoinEdge Revenue',
       value: formatCurrency(stats?.coinedgeRevenue || 0),
-      subvalue: '70% of fees',
+      subvalue: '3.75% of card value',
       icon: TrendingUp,
       color: 'text-accent',
       bgColor: 'bg-accent/10',
@@ -60,7 +72,7 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Rep Commissions',
       value: formatCurrency(stats?.totalRepCommissions || 0),
-      subvalue: '30% of fees',
+      subvalue: '2% of redemptions',
       icon: Users,
       color: 'text-warning',
       bgColor: 'bg-warning/10',
@@ -132,6 +144,49 @@ const AdminDashboard: React.FC = () => {
           </Card>
         ))}
       </div>
+
+      {/* Fee Allocation Breakdown */}
+      <Card className="mt-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <PieChart className="h-5 w-5 text-primary" />
+            </div>
+            <CardTitle>Fee Allocation Model</CardTitle>
+          </div>
+          <Badge variant="outline" className="text-sm font-semibold">
+            Total: {TOTAL_FEE_RATE.toFixed(2)}%
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Allocation</TableHead>
+                <TableHead className="text-right">%</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {FEE_ALLOCATIONS.map((fee) => (
+                <TableRow key={fee.name}>
+                  <TableCell className={`font-medium ${fee.color}`}>
+                    {fee.name}
+                  </TableCell>
+                  <TableCell className={`text-right font-semibold ${fee.color}`}>
+                    {fee.rate.toFixed(2)}%
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="border-t-2 border-primary/20 bg-muted/50">
+                <TableCell className="font-bold">Total</TableCell>
+                <TableCell className="text-right font-bold text-primary">
+                  {TOTAL_FEE_RATE.toFixed(2)}%
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Merchant Performance Table */}
       <Card className="mt-6">
