@@ -39,7 +39,7 @@ import { useSalesReps } from '@/hooks/useAdminStats';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, MoreHorizontal, UserCheck, UserX, Key, Eye, Store, DollarSign, TrendingUp, Calendar, Phone, Mail, User } from 'lucide-react';
+import { Plus, MoreHorizontal, UserCheck, UserX, Key, Eye, Store, DollarSign, TrendingUp, Calendar, Phone, Mail, User, Copy, Check, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 
@@ -63,6 +63,9 @@ const AdminSalesReps: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedRep, setSelectedRep] = useState<SalesRep | null>(null);
   const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [tempPassword, setTempPassword] = useState('');
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -120,6 +123,70 @@ const AdminSalesReps: React.FC = () => {
   const handleViewProfile = (rep: SalesRep) => {
     setSelectedRep(rep);
     setIsViewProfileOpen(true);
+  };
+
+  const generateTempPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const handleOpenResetPassword = (rep: SalesRep) => {
+    setSelectedRep(rep);
+    setTempPassword(generateTempPassword());
+    setIsResetPasswordOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedRep || !tempPassword) return;
+
+    setIsResettingPassword(true);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-sales-rep-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            rep_id: selectedRep.id,
+            new_password: tempPassword,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to reset password');
+      }
+
+      toast({
+        title: 'Password Reset',
+        description: `Password has been reset for ${selectedRep.full_name}. They will be required to change it on next login.`,
+      });
+
+      setIsResetPasswordOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['admin-sales-reps'] });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
   const generatePassword = () => {
@@ -411,7 +478,7 @@ const AdminSalesReps: React.FC = () => {
                               Disable
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenResetPassword(rep as SalesRep)}>
                             <Key className="mr-2 h-4 w-4" />
                             Reset Password
                           </DropdownMenuItem>
@@ -621,6 +688,102 @@ const AdminSalesReps: React.FC = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsViewProfileOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Reset Password
+            </DialogTitle>
+            <DialogDescription>
+              Generate a new temporary password for {selectedRep?.full_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg border border-warning/20 bg-warning/5 p-4">
+              <p className="text-sm text-warning-foreground">
+                The sales rep will be required to change this password on their next login.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Sales Rep</Label>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">{selectedRep?.full_name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedRep?.email}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>New Temporary Password</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    value={tempPassword}
+                    onChange={(e) => setTempPassword(e.target.value)}
+                    className="pr-10 font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => {
+                      navigator.clipboard.writeText(tempPassword);
+                      toast({
+                        title: 'Copied',
+                        description: 'Password copied to clipboard',
+                      });
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setTempPassword(generateTempPassword())}
+                  title="Generate new password"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Click to copy or generate a new password
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleResetPassword} 
+              disabled={isResettingPassword || !tempPassword}
+            >
+              {isResettingPassword ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <Key className="mr-2 h-4 w-4" />
+                  Reset Password
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
