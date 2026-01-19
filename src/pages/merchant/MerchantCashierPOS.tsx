@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Scan, DollarSign, CheckCircle, Loader2, Camera, Wallet, Info } from 'lucide-react';
+import { Scan, DollarSign, CheckCircle, Loader2, Camera, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useFeeCalculation, formatCurrency, FEE_RATES } from '@/hooks/useFeeCalculation';
 
@@ -161,7 +161,7 @@ const MerchantCashierPOS: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['merchant-ledger'] });
       toast({ 
         title: 'Card Activated!', 
-        description: `$${baseAmount} card activated. You'll earn ${formatCurrency(fees.merchantCommission)} (4%) when customer redeems.` 
+        description: `$${baseAmount} card activated successfully.` 
       });
     } catch (error) {
       console.error('Activation error:', error);
@@ -190,14 +190,9 @@ const MerchantCashierPOS: React.FC = () => {
           <CardContent className="flex flex-col items-center py-12">
             <CheckCircle className="h-20 w-20 text-green-500 mb-6" />
             <h2 className="text-3xl font-bold mb-4">Card Activated!</h2>
-            <p className="text-muted-foreground text-center mb-2">
+            <p className="text-muted-foreground text-center">
               {bitcardId} activated for {formatCurrency(baseAmount)}
             </p>
-            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mt-4 text-center">
-              <p className="text-sm text-green-700 dark:text-green-300">
-                You'll earn <strong>{formatCurrency(fees.merchantCommission)}</strong> (4%) when this card is redeemed
-              </p>
-            </div>
             <Button onClick={handleReset} size="lg" className="mt-8 w-full">
               New Sale
             </Button>
@@ -295,17 +290,8 @@ const MerchantCashierPOS: React.FC = () => {
                 <span className="text-muted-foreground">Customer Pays</span>
                 <span className="text-xl font-bold">{formatCurrency(baseAmount)}</span>
               </div>
-              <div className="border-t pt-3">
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                  <div>
-                    <p>At redemption, you'll earn <strong className="text-green-600">{formatCurrency(fees.merchantCommission)}</strong> (4%)</p>
-                    <p className="text-xs mt-1">Customer receives ~{formatCurrency(fees.netBtcValue)} in BTC value</p>
-                  </div>
-                </div>
-              </div>
               {baseAmount > cashBalance && (
-                <div className="text-sm text-destructive">
+                <div className="text-sm text-destructive border-t pt-3">
                   Insufficient cash credit. Add more balance to continue.
                 </div>
               )}
