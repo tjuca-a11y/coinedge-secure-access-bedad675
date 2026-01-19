@@ -249,15 +249,6 @@ const MerchantAddBalance: React.FC = () => {
                 </ul>
               </div>
 
-              {/* Fee breakdown info */}
-              <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
-                <p className="font-medium mb-2">At customer redemption:</p>
-                <ul className="space-y-1">
-                  <li>• Merchant: {(FEE_RATES.MERCHANT * 100).toFixed(0)}%</li>
-                  <li>• Sales Rep: {(FEE_RATES.SALES_REP * 100).toFixed(0)}%</li>
-                  <li>• CoinEdge: {(FEE_RATES.COINEDGE * 100).toFixed(2)}%</li>
-                </ul>
-              </div>
 
               {/* Pay Button */}
               <Button
