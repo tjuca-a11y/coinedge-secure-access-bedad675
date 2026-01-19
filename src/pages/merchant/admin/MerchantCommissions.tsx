@@ -134,6 +134,34 @@ const MerchantCommissions: React.FC = () => {
 
   return (
     <MerchantLayout title="Commission Summary" subtitle="Track your earnings by payment method">
+      {/* Commission Rates Banner */}
+      <Card className="mb-6 border-primary/20 bg-gradient-to-r from-primary/5 to-success/5">
+        <CardContent className="py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <span className="font-semibold">Your Commission Rates</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-blue-500" />
+                <span className="text-sm">Card Sales:</span>
+                <Badge variant="outline" className="font-bold text-blue-600 border-blue-300">
+                  2%
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Banknote className="h-4 w-4 text-green-500" />
+                <span className="text-sm">Cash Sales:</span>
+                <Badge variant="outline" className="font-bold text-green-600 border-green-300">
+                  5%
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Period Selector */}
       <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)} className="mb-6">
         <TabsList className="grid w-full grid-cols-4 max-w-md">
