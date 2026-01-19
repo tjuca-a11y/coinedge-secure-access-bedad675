@@ -8,13 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, CheckCircle, Loader2, AlertCircle, Wallet } from 'lucide-react';
+import { DollarSign, CheckCircle, Loader2, AlertCircle, Wallet, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useSquarePayment } from '@/hooks/useSquarePayment';
-import { formatCurrency } from '@/hooks/useFeeCalculation';
-
-const SETUP_FEE = 50;
-const MIN_INITIAL_CASH_CREDIT = 100;
+import { formatCurrency, SETUP_FEE, MIN_INITIAL_FUNDING, MIN_CASH_CREDIT, FEE_RATES } from '@/hooks/useFeeCalculation';
 
 const MerchantAddBalance: React.FC = () => {
   const { merchant, merchantUser, refreshMerchantData, wallet } = useMerchantAuth();
@@ -27,15 +23,6 @@ const MerchantAddBalance: React.FC = () => {
   const isInitialFunding = !merchant?.is_initially_funded;
   const cashCreditAmount = customAmount ? parseFloat(customAmount) : 0;
   const totalPayment = isInitialFunding ? cashCreditAmount + SETUP_FEE : cashCreditAmount;
-
-  const squarePayment = useSquarePayment({
-    onSuccess: async () => {
-      await processBalanceAddition();
-    },
-    onError: (error) => {
-      toast({ title: 'Payment Failed', description: error, variant: 'destructive' });
-    },
-  });
 
   const processBalanceAddition = async () => {
     if (!merchant?.id || !merchantUser?.id) return;
@@ -68,15 +55,15 @@ const MerchantAddBalance: React.FC = () => {
           })
           .eq('merchant_id', merchant.id);
 
-        // Credit sales rep bonus from setup fee
+        // Credit sales rep bonus from setup fee ($50 goes to sales rep)
         if (merchant.rep_id) {
           await supabase.from('commission_ledger').insert({
-            commission_id: `bonus-${Date.now()}`,
+            commission_id: `signup-bonus-${Date.now()}`,
             rep_id: merchant.rep_id,
             merchant_id: merchant.id,
             card_value_usd: 0,
             activation_fee_usd: 0,
-            rep_commission_usd: SETUP_FEE,
+            rep_commission_usd: SETUP_FEE, // $50 setup fee credited to sales rep
             coinedge_revenue_usd: 0,
             status: 'accrued',
           });
@@ -121,24 +108,9 @@ const MerchantAddBalance: React.FC = () => {
     }
   };
 
-  // Mock payment for now - will use Square when integrated
   const addBalanceMutation = useMutation({
     mutationFn: async () => {
       if (!merchant?.id || !merchantUser?.id) throw new Error('Not authenticated');
-
-      // Create square payment record (mock)
-      const { error: paymentError } = await supabase
-        .from('square_payments')
-        .insert({
-          merchant_id: merchant.id,
-          amount_usd: totalPayment,
-          status: 'PAID',
-          square_payment_id: `mock-${Date.now()}`,
-          created_by_merchant_user_id: merchantUser.id,
-        });
-
-      if (paymentError) throw paymentError;
-
       await processBalanceAddition();
     },
     onError: (error) => {
@@ -160,10 +132,10 @@ const MerchantAddBalance: React.FC = () => {
       });
       return;
     }
-    if (isInitialFunding && cashCreditAmount < MIN_INITIAL_CASH_CREDIT) {
+    if (isInitialFunding && cashCreditAmount < MIN_CASH_CREDIT) {
       toast({
         title: 'Minimum Required',
-        description: `Minimum initial cash credit is ${formatCurrency(MIN_INITIAL_CASH_CREDIT)}`,
+        description: `Minimum initial cash credit is ${formatCurrency(MIN_CASH_CREDIT)}`,
         variant: 'destructive',
       });
       return;
@@ -175,7 +147,6 @@ const MerchantAddBalance: React.FC = () => {
     setPaymentSuccess(false);
     setCustomAmount('');
     setAddedAmount(0);
-    squarePayment.reset();
   };
 
   if (paymentSuccess) {
@@ -211,7 +182,7 @@ const MerchantAddBalance: React.FC = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Initial Funding Required</AlertTitle>
             <AlertDescription>
-              Choose how much cash credit you want to start with. A one-time {formatCurrency(SETUP_FEE)} setup fee will be added.
+              Minimum {formatCurrency(MIN_INITIAL_FUNDING)} to start ({formatCurrency(MIN_CASH_CREDIT)} cash credit + {formatCurrency(SETUP_FEE)} setup fee).
             </AlertDescription>
           </Alert>
 
@@ -219,7 +190,7 @@ const MerchantAddBalance: React.FC = () => {
             <CardHeader>
               <CardTitle>Initial Funding</CardTitle>
               <CardDescription>
-                This payment activates your account and provides cash credit for sales.
+                This payment activates your account and provides cash credit for activating customer cards.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -231,16 +202,16 @@ const MerchantAddBalance: React.FC = () => {
                   <Input
                     id="initialAmount"
                     type="number"
-                    placeholder={`Minimum ${formatCurrency(MIN_INITIAL_CASH_CREDIT)}`}
+                    placeholder={`Minimum ${formatCurrency(MIN_CASH_CREDIT)}`}
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
                     className="pl-10 text-lg h-14"
-                    min={MIN_INITIAL_CASH_CREDIT}
+                    min={MIN_CASH_CREDIT}
                     step="0.01"
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Minimum: {formatCurrency(MIN_INITIAL_CASH_CREDIT)}
+                  Minimum: {formatCurrency(MIN_CASH_CREDIT)}
                 </p>
               </div>
 
@@ -265,22 +236,33 @@ const MerchantAddBalance: React.FC = () => {
                 </div>
               )}
 
+              {/* Commission Info */}
               <div className="rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-4">
-                <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">
-                  What you get:
+                <h4 className="font-medium text-green-800 dark:text-green-200 mb-2 flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  How you earn:
                 </h4>
                 <ul className="text-sm text-green-700 dark:text-green-300 space-y-1">
-                  <li>• Your chosen cash credit for cash sales</li>
-                  <li>• 5% commission on cash sales</li>
-                  <li>• 2% commission on card sales</li>
-                  <li>• Access to POS terminal</li>
+                  <li>• When a customer redeems their card for BTC, you earn <strong>4%</strong> commission</li>
+                  <li>• No upfront costs on activations - just deducted from your cash credit</li>
+                  <li>• Top up anytime to keep activating cards</li>
+                </ul>
+              </div>
+
+              {/* Fee breakdown info */}
+              <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
+                <p className="font-medium mb-2">At customer redemption:</p>
+                <ul className="space-y-1">
+                  <li>• Merchant: {(FEE_RATES.MERCHANT * 100).toFixed(0)}%</li>
+                  <li>• Sales Rep: {(FEE_RATES.SALES_REP * 100).toFixed(0)}%</li>
+                  <li>• CoinEdge: {(FEE_RATES.COINEDGE * 100).toFixed(2)}%</li>
                 </ul>
               </div>
 
               {/* Pay Button */}
               <Button
                 onClick={handleSubmit}
-                disabled={cashCreditAmount < MIN_INITIAL_CASH_CREDIT || addBalanceMutation.isPending}
+                disabled={cashCreditAmount < MIN_CASH_CREDIT || addBalanceMutation.isPending}
                 className="w-full"
                 size="lg"
               >
@@ -317,7 +299,7 @@ const MerchantAddBalance: React.FC = () => {
           <CardHeader>
             <CardTitle>Add Cash Credit</CardTitle>
             <CardDescription>
-              Add any amount to your cash credit. Used for cash sales, earning you 5% commission per sale.
+              Add funds to activate more customer cards. You earn 4% commission when cards are redeemed.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -368,10 +350,6 @@ const MerchantAddBalance: React.FC = () => {
                 <>Add {formatCurrency(cashCreditAmount)} to Cash Credit</>
               )}
             </Button>
-
-            <p className="text-center text-sm text-muted-foreground">
-              Note: Square payment integration coming soon. Currently using mock payments for testing.
-            </p>
           </CardContent>
         </Card>
       </div>

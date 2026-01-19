@@ -1,19 +1,17 @@
 import React from 'react';
-import { DollarSign, TrendingUp } from 'lucide-react';
-import { formatCurrency, type PaymentMethod } from '@/hooks/useFeeCalculation';
+import { DollarSign, TrendingUp, Info } from 'lucide-react';
+import { formatCurrency, FEE_RATES } from '@/hooks/useFeeCalculation';
 
 interface CommissionDisplayProps {
   commission: number;
-  paymentMethod: PaymentMethod;
   showRate?: boolean;
 }
 
 export const CommissionDisplay: React.FC<CommissionDisplayProps> = ({
   commission,
-  paymentMethod,
   showRate = true,
 }) => {
-  const rate = paymentMethod === 'CASH' ? 5 : 2;
+  const rate = FEE_RATES.MERCHANT * 100; // 4%
 
   return (
     <div className="rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-4">
@@ -28,7 +26,7 @@ export const CommissionDisplay: React.FC<CommissionDisplayProps> = ({
             </p>
             {showRate && (
               <p className="text-xs text-green-600 dark:text-green-400">
-                {rate}% on {paymentMethod.toLowerCase()} sales
+                {rate}% at redemption
               </p>
             )}
           </div>
@@ -46,24 +44,23 @@ export const CommissionDisplay: React.FC<CommissionDisplayProps> = ({
 
 interface CommissionSuccessProps {
   commission: number;
-  paymentMethod: PaymentMethod;
 }
 
 export const CommissionSuccess: React.FC<CommissionSuccessProps> = ({
   commission,
-  paymentMethod,
 }) => {
   return (
     <div className="text-center">
       <div className="inline-flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900 p-4 mb-4">
         <TrendingUp className="h-10 w-10 text-green-600 dark:text-green-400" />
       </div>
-      <p className="text-lg text-muted-foreground mb-2">You Earned</p>
+      <p className="text-lg text-muted-foreground mb-2">You'll Earn</p>
       <p className="text-4xl font-bold text-green-600 dark:text-green-400">
         {formatCurrency(commission)}
       </p>
-      <p className="text-sm text-muted-foreground mt-2">
-        {paymentMethod === 'CASH' ? 'Cash' : 'Card'} Sale Commission
+      <p className="text-sm text-muted-foreground mt-2 flex items-center justify-center gap-1">
+        <Info className="h-4 w-4" />
+        Credited when customer redeems
       </p>
     </div>
   );
