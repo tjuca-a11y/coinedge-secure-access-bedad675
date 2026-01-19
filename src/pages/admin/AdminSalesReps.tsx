@@ -38,9 +38,22 @@ import {
 import { useSalesReps } from '@/hooks/useAdminStats';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useQueryClient } from '@tanstack/react-query';
-import { Plus, MoreHorizontal, UserCheck, UserX, Key, Eye } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, MoreHorizontal, UserCheck, UserX, Key, Eye, Store, DollarSign, TrendingUp, Calendar, Phone, Mail, User } from 'lucide-react';
 import { format } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
+
+interface SalesRep {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  dob: string;
+  status: string;
+  created_at: string;
+  last_login_at: string | null;
+  user_id: string;
+}
 
 const AdminSalesReps: React.FC = () => {
   const { data: salesReps, isLoading } = useSalesReps();
@@ -48,6 +61,8 @@ const AdminSalesReps: React.FC = () => {
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedRep, setSelectedRep] = useState<SalesRep | null>(null);
+  const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -56,6 +71,56 @@ const AdminSalesReps: React.FC = () => {
     password: '',
     status: 'cleared' as 'draft' | 'cleared',
   });
+
+  // Fetch rep profile data when viewing
+  const { data: repProfileData, isLoading: isProfileLoading } = useQuery({
+    queryKey: ['sales-rep-profile', selectedRep?.id],
+    queryFn: async () => {
+      if (!selectedRep?.id) return null;
+
+      // Fetch assigned merchants
+      const { data: merchants, error: merchantsError } = await supabase
+        .from('merchants')
+        .select('id, business_name, status, created_at')
+        .eq('rep_id', selectedRep.id);
+
+      if (merchantsError) throw merchantsError;
+
+      // Fetch commission data
+      const { data: commissions, error: commissionsError } = await supabase
+        .from('commission_ledger')
+        .select('rep_commission_usd, card_value_usd, status, activated_at')
+        .eq('rep_id', selectedRep.id);
+
+      if (commissionsError) throw commissionsError;
+
+      // Calculate totals
+      const totalCommission = commissions?.reduce((sum, c) => sum + (c.rep_commission_usd || 0), 0) || 0;
+      const totalVolume = commissions?.reduce((sum, c) => sum + (c.card_value_usd || 0), 0) || 0;
+      const activeMerchants = merchants?.filter(m => m.status === 'active').length || 0;
+      const signupBonuses = (merchants?.length || 0) * 50; // $50 per merchant signup
+
+      return {
+        merchants: merchants || [],
+        commissions: commissions || [],
+        stats: {
+          totalMerchants: merchants?.length || 0,
+          activeMerchants,
+          totalCommission,
+          totalVolume,
+          signupBonuses,
+          redemptionCommission: totalCommission,
+          totalEarnings: signupBonuses + totalCommission,
+        },
+      };
+    },
+    enabled: !!selectedRep?.id && isViewProfileOpen,
+  });
+
+  const handleViewProfile = (rep: SalesRep) => {
+    setSelectedRep(rep);
+    setIsViewProfileOpen(true);
+  };
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -329,8 +394,8 @@ const AdminSalesReps: React.FC = () => {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="bg-background">
+                          <DropdownMenuItem onClick={() => handleViewProfile(rep as SalesRep)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Profile
                           </DropdownMenuItem>
@@ -364,6 +429,202 @@ const AdminSalesReps: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* View Profile Dialog */}
+      <Dialog open={isViewProfileOpen} onOpenChange={setIsViewProfileOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Sales Rep Profile
+            </DialogTitle>
+            <DialogDescription>
+              View detailed information and performance metrics
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedRep && (
+            <div className="space-y-6">
+              {/* Basic Info */}
+              <div className="rounded-lg border p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Personal Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Full Name</Label>
+                    <p className="font-medium">{selectedRep.full_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Status</Label>
+                    <div>
+                      <Badge variant={getStatusBadgeVariant(selectedRep.status)}>
+                        {selectedRep.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Email</Label>
+                      <p className="font-medium">{selectedRep.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Phone</Label>
+                      <p className="font-medium">{selectedRep.phone}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Date of Birth</Label>
+                      <p className="font-medium">
+                        {selectedRep.dob ? format(new Date(selectedRep.dob), 'MMM d, yyyy') : 'Not set'}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Member Since</Label>
+                    <p className="font-medium">
+                      {format(new Date(selectedRep.created_at), 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Commission Model */}
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  Commission Model
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-lg bg-background p-3 border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Store className="h-4 w-4 text-success" />
+                      <span className="text-sm text-muted-foreground">Merchant Signup Bonus</span>
+                    </div>
+                    <p className="text-2xl font-bold text-success">$50</p>
+                    <p className="text-xs text-muted-foreground">Per new merchant</p>
+                  </div>
+                  <div className="rounded-lg bg-background p-3 border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <DollarSign className="h-4 w-4 text-primary" />
+                      <span className="text-sm text-muted-foreground">Redemption Commission</span>
+                    </div>
+                    <p className="text-2xl font-bold text-primary">2%</p>
+                    <p className="text-xs text-muted-foreground">Of BitCard redemptions</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Stats */}
+              {isProfileLoading ? (
+                <div className="flex h-24 items-center justify-center">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : repProfileData ? (
+                <>
+                  <div className="rounded-lg border p-4">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Performance Summary
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center p-3 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold">{repProfileData.stats.totalMerchants}</p>
+                        <p className="text-xs text-muted-foreground">Total Merchants</p>
+                      </div>
+                      <div className="text-center p-3 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold text-success">{repProfileData.stats.activeMerchants}</p>
+                        <p className="text-xs text-muted-foreground">Active Merchants</p>
+                      </div>
+                      <div className="text-center p-3 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold">{repProfileData.commissions.length}</p>
+                        <p className="text-xs text-muted-foreground">Total Redemptions</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border p-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-green-700 dark:text-green-300">
+                      <DollarSign className="h-4 w-4" />
+                      Earnings Breakdown
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Signup Bonuses ({repProfileData.stats.totalMerchants} × $50)</span>
+                        <span className="font-semibold">
+                          ${repProfileData.stats.signupBonuses.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Redemption Commissions (2%)</span>
+                        <span className="font-semibold">
+                          ${repProfileData.stats.redemptionCommission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <Separator className="my-2" />
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-green-700 dark:text-green-300">Total Earnings</span>
+                        <span className="text-xl font-bold text-green-700 dark:text-green-300">
+                          ${repProfileData.stats.totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assigned Merchants */}
+                  {repProfileData.merchants.length > 0 && (
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <Store className="h-4 w-4" />
+                        Assigned Merchants ({repProfileData.merchants.length})
+                      </h3>
+                      <div className="max-h-48 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Business Name</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Joined</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {repProfileData.merchants.map((merchant) => (
+                              <TableRow key={merchant.id}>
+                                <TableCell className="font-medium">{merchant.business_name}</TableCell>
+                                <TableCell>
+                                  <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                                    {merchant.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                  {format(new Date(merchant.created_at), 'MMM d, yyyy')}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewProfileOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
