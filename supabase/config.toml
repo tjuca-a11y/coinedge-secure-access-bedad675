@@ -72,6 +72,9 @@ verify_jwt = false
 [functions.square-check-payment]
 verify_jwt = false
 
+[functions.reset-sales-rep-password]
+verify_jwt = false
+
 # Cron job to run fulfillment queue processing every 5 minutes
 [[cron]]
 schedule = "*/5 * * * *"
