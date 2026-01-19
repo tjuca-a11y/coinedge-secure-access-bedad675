@@ -1,117 +1,62 @@
 import { useMemo } from 'react';
 
-export type PaymentMethod = 'CARD' | 'CASH';
+// Fee structure: All fees are deducted at REDEMPTION (when customer claims BTC)
+// At purchase, customer pays exact face value, deducted from merchant's cash credit
 
-export interface PosFeeBreakdown {
+export interface FeeBreakdown {
   baseAmount: number;
-  merchantFee: number;
-  squareProcessing: number;
-  totalPosFee: number;
-  customerPays: number;
-  merchantCommissionRate: number;
-}
-
-export interface RedemptionFeeBreakdown {
-  baseAmount: number;
-  salesRepFee: number;
-  volatilityReserve: number;
+  merchantCommission: number;
+  salesRepCommission: number;
   coinedgeRevenue: number;
-  totalRedemptionFee: number;
-  netValue: number;
-}
-
-export interface FeeBreakdown extends PosFeeBreakdown, RedemptionFeeBreakdown {
   totalFee: number;
+  netBtcValue: number;
 }
 
-// POS Fee rates (charged at purchase)
-const POS_FEE_RATES = {
-  MERCHANT_CARD: 0.02,     // 2%
-  MERCHANT_CASH: 0.05,     // 5%
-  SQUARE_PROCESSING_RATE: 0.026, // 2.6% (card only)
-  SQUARE_PROCESSING_FIXED: 0.15, // $0.15 per transaction (card only)
+// Fee rates (all applied at redemption)
+export const FEE_RATES = {
+  MERCHANT: 0.04,      // 4% - paid to merchant
+  SALES_REP: 0.02,     // 2% - paid to sales rep
+  COINEDGE: 0.0775,    // 7.75% - CoinEdge revenue
 };
 
-// Redemption fee rates (deducted when claiming BTC)
-const REDEMPTION_FEE_RATES = {
-  SALES_REP: 0.02,        // 2%
-  VOLATILITY: 0.03,       // 3%
-  COINEDGE: 0.0375,       // 3.75%
-};
+export const TOTAL_FEE_RATE = FEE_RATES.MERCHANT + FEE_RATES.SALES_REP + FEE_RATES.COINEDGE; // 13.75%
 
-export const POS_FEE_RATE_CARD = POS_FEE_RATES.MERCHANT_CARD + POS_FEE_RATES.SQUARE_PROCESSING_RATE; // ~4.6% + $0.15
-export const POS_FEE_RATE_CASH = POS_FEE_RATES.MERCHANT_CASH; // 5%
-export const REDEMPTION_FEE_RATE = REDEMPTION_FEE_RATES.SALES_REP + REDEMPTION_FEE_RATES.VOLATILITY + REDEMPTION_FEE_RATES.COINEDGE; // 8.75%
+// Setup/funding constants
+export const SETUP_FEE = 50;           // $50 one-time setup fee (credited to sales rep)
+export const MIN_INITIAL_FUNDING = 300; // $300 minimum to start
+export const MIN_CASH_CREDIT = 250;    // $300 - $50 = $250 minimum cash credit
 
-// Legacy total for reference (not used at POS anymore)
-export const TOTAL_FEE_RATE = 0.1375; // 13.75%
-
-export function calculatePosFees(baseAmount: number, paymentMethod: PaymentMethod): PosFeeBreakdown {
-  // Merchant commission: 2% for card, 5% for cash
-  const merchantFee = paymentMethod === 'CASH' 
-    ? baseAmount * POS_FEE_RATES.MERCHANT_CASH 
-    : baseAmount * POS_FEE_RATES.MERCHANT_CARD;
-  
-  // Square charges 2.6% + $0.15 processing on card payments (not us)
-  const squareProcessing = paymentMethod === 'CARD' 
-    ? (baseAmount * POS_FEE_RATES.SQUARE_PROCESSING_RATE) + POS_FEE_RATES.SQUARE_PROCESSING_FIXED
-    : 0;
-  
-  // For card: customer pays base + 3% Square processing
-  // For cash: customer pays base only (merchant keeps 5% from their margin)
-  const totalPosFee = squareProcessing; // Only Square fee is charged to customer
-  const customerPays = baseAmount + totalPosFee;
+/**
+ * Calculate fee breakdown for a given USD amount
+ * All fees are deducted at redemption, not at purchase
+ */
+export function calculateFees(baseAmount: number): FeeBreakdown {
+  const merchantCommission = baseAmount * FEE_RATES.MERCHANT;
+  const salesRepCommission = baseAmount * FEE_RATES.SALES_REP;
+  const coinedgeRevenue = baseAmount * FEE_RATES.COINEDGE;
+  const totalFee = merchantCommission + salesRepCommission + coinedgeRevenue;
+  const netBtcValue = baseAmount - totalFee;
   
   return {
     baseAmount,
-    merchantFee,
-    squareProcessing,
-    totalPosFee,
-    customerPays,
-    merchantCommissionRate: paymentMethod === 'CASH' ? 5 : 2,
-  };
-}
-
-export function calculateRedemptionFees(baseAmount: number): RedemptionFeeBreakdown {
-  const salesRepFee = baseAmount * REDEMPTION_FEE_RATES.SALES_REP;
-  const volatilityReserve = baseAmount * REDEMPTION_FEE_RATES.VOLATILITY;
-  const coinedgeRevenue = baseAmount * REDEMPTION_FEE_RATES.COINEDGE;
-  const totalRedemptionFee = salesRepFee + volatilityReserve + coinedgeRevenue;
-  const netValue = baseAmount - totalRedemptionFee;
-  
-  return {
-    baseAmount,
-    salesRepFee,
-    volatilityReserve,
+    merchantCommission,
+    salesRepCommission,
     coinedgeRevenue,
-    totalRedemptionFee,
-    netValue,
+    totalFee,
+    netBtcValue,
   };
 }
 
-export function calculateFees(baseAmount: number, paymentMethod: PaymentMethod): FeeBreakdown {
-  const posFees = calculatePosFees(baseAmount, paymentMethod);
-  const redemptionFees = calculateRedemptionFees(baseAmount);
-  
-  return {
-    ...posFees,
-    ...redemptionFees,
-    totalFee: posFees.totalPosFee + redemptionFees.totalRedemptionFee,
-  };
+/**
+ * Hook to calculate fees with memoization
+ */
+export function useFeeCalculation(baseAmount: number): FeeBreakdown {
+  return useMemo(() => calculateFees(baseAmount), [baseAmount]);
 }
 
-export function useFeeCalculation(baseAmount: number, paymentMethod: PaymentMethod): FeeBreakdown {
-  return useMemo(() => calculateFees(baseAmount, paymentMethod), [baseAmount, paymentMethod]);
-}
-
-export function usePosFeeCalculation(baseAmount: number, paymentMethod: PaymentMethod): PosFeeBreakdown {
-  return useMemo(() => calculatePosFees(baseAmount, paymentMethod), [baseAmount, paymentMethod]);
-}
-
-export function useRedemptionFeeCalculation(baseAmount: number): RedemptionFeeBreakdown {
-  return useMemo(() => calculateRedemptionFees(baseAmount), [baseAmount]);
-}
-
+/**
+ * Format a number as USD currency
+ */
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -119,4 +64,11 @@ export function formatCurrency(amount: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+/**
+ * Format a percentage
+ */
+export function formatPercent(rate: number): string {
+  return `${(rate * 100).toFixed(2)}%`;
 }

@@ -29,16 +29,14 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-// Fee allocation structure
+// Fee allocation structure (all fees deducted at redemption)
 const FEE_ALLOCATIONS = [
-  { name: 'Sales Rep', rate: 2.00, color: 'text-warning' },
-  { name: 'Merchant', rate: 5.00, color: 'text-success' },
-  { name: 'Volatility Reserve', rate: 3.00, color: 'text-blue-500' },
-  { name: 'Payment Processing', rate: 0.00, color: 'text-muted-foreground' },
-  { name: 'CoinEdge', rate: 3.75, color: 'text-primary' },
+  { name: 'Merchant Commission', rate: 4.00, color: 'text-success' },
+  { name: 'Sales Rep Commission', rate: 2.00, color: 'text-warning' },
+  { name: 'CoinEdge Revenue', rate: 7.75, color: 'text-primary' },
 ];
 
-const TOTAL_FEE_RATE = FEE_ALLOCATIONS.reduce((sum, fee) => sum + fee.rate, 0);
+const TOTAL_FEE_RATE = FEE_ALLOCATIONS.reduce((sum, fee) => sum + fee.rate, 0); // 13.75%
 
 const AdminDashboard: React.FC = () => {
   const { data: stats, isLoading: statsLoading } = useAdminStats();
@@ -56,7 +54,7 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Activation Fees',
       value: formatCurrency(stats?.totalActivationFees || 0),
-      subvalue: `${TOTAL_FEE_RATE.toFixed(2)}% of card value`,
+      subvalue: `${TOTAL_FEE_RATE.toFixed(2)}% at redemption`,
       icon: DollarSign,
       color: 'text-success',
       bgColor: 'bg-success/10',
@@ -64,7 +62,7 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'CoinEdge Revenue',
       value: formatCurrency(stats?.coinedgeRevenue || 0),
-      subvalue: '3.75% of card value',
+      subvalue: '7.75% at redemption',
       icon: TrendingUp,
       color: 'text-accent',
       bgColor: 'bg-accent/10',
@@ -72,7 +70,7 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Rep Commissions',
       value: formatCurrency(stats?.totalRepCommissions || 0),
-      subvalue: '2% of redemptions',
+      subvalue: '2% at redemption',
       icon: Users,
       color: 'text-warning',
       bgColor: 'bg-warning/10',
