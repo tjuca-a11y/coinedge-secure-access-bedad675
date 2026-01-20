@@ -51,6 +51,9 @@ import AdminTreasuryDashboard from "./pages/admin/AdminTreasuryDashboard";
 import AdminReconciliation from "./pages/admin/AdminReconciliation";
 import AdminHealthCheck from "./pages/admin/AdminHealthCheck";
 
+// Investor page
+import InvestorPitchDeck from "./pages/investor/InvestorPitchDeck";
+
 // Sales Rep pages
 import SalesRepLogin from "./pages/sales-rep/SalesRepLogin";
 import SalesRepResetPassword from "./pages/sales-rep/SalesRepResetPassword";
@@ -85,6 +88,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public Investor Route */}
+            <Route path="/investor" element={<InvestorPitchDeck />} />
+
             {/* Admin Routes */}
             <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
             <Route path="/admin/*" element={
