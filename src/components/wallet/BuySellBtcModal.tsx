@@ -261,26 +261,22 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   return (
     <Dialog open={effectiveOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className="p-2 bg-btc/10 rounded-full">
-              <Bitcoin className="h-5 w-5 text-btc" />
-            </div>
-            Buy or Sell Bitcoin
-          </DialogTitle>
-        </DialogHeader>
-
         {/* Bitcoin Price Chart */}
-        <Card className="mb-4 bg-muted/30">
+        <Card className="mb-4 bg-muted/30 mt-2">
           <div className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div>
-                <p className="text-sm text-muted-foreground">Bitcoin Price</p>
-                <p className="text-xl font-bold">${currentBtcPrice.toLocaleString()}</p>
-                <p className="text-xs text-success flex items-center gap-1">
-                  <ArrowUpRight className="h-3 w-3" />
-                  +2.05% today
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-btc/10 rounded-full">
+                  <Bitcoin className="h-5 w-5 text-btc" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Bitcoin Price</p>
+                  <p className="text-xl font-bold">${currentBtcPrice.toLocaleString()}</p>
+                  <p className="text-xs text-success flex items-center gap-1">
+                    <ArrowUpRight className="h-3 w-3" />
+                    +2.05% today
+                  </p>
+                </div>
               </div>
             </div>
             <div className="h-[100px]">
