@@ -38,6 +38,7 @@ interface BuySellBtcModalProps {
   currentBtcPrice: number;
   btcBalance: number;
   usdcBalance: number;
+  defaultTab?: "buy" | "sell";
 }
 
 type PaymentMethod = "usdc_wallet" | "plaid_bank";
@@ -49,6 +50,7 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
   currentBtcPrice,
   btcBalance,
   usdcBalance,
+  defaultTab = "buy",
 }) => {
   const { user, profile, isKycApproved: supabaseKycApproved } = useAuth();
   const { isConnected, btcWallet, signMessage, isWalletInitializing, isAuthenticated: isDynamicAuthenticated, syncedProfile } = useDynamicWallet();
@@ -74,7 +76,14 @@ export const BuySellBtcModal: React.FC<BuySellBtcModalProps> = ({
     ? syncedProfile?.kycStatus === 'approved' 
     : supabaseKycApproved;
   
-  const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
+  const [activeTab, setActiveTab] = useState<"buy" | "sell">(defaultTab);
+  
+  // Sync activeTab when defaultTab changes or modal opens
+  useEffect(() => {
+    if (open) {
+      setActiveTab(defaultTab);
+    }
+  }, [open, defaultTab]);
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("usdc_wallet");
   const [sellDestination, setSellDestination] = useState<SellDestination>("usdc_wallet");

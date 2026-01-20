@@ -66,6 +66,7 @@ const Wallet: React.FC = () => {
   const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [buySellModalOpen, setBuySellModalOpen] = useState(false);
+  const [buySellDefaultTab, setBuySellDefaultTab] = useState<"buy" | "sell">("buy");
   const [usdcActionsModalOpen, setUsdcActionsModalOpen] = useState(false);
   const [cashOutModalOpen, setCashOutModalOpen] = useState(false);
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
@@ -254,7 +255,10 @@ const Wallet: React.FC = () => {
             variant="outline" 
             disabled={!isKycApproved} 
             className="gap-2 flex-1 sm:flex-none text-sm"
-            onClick={() => setBuySellModalOpen(true)}
+            onClick={() => {
+              setBuySellDefaultTab("buy");
+              setBuySellModalOpen(true);
+            }}
           >
             <ShoppingCart className="h-4 w-4" />
             Buy
@@ -263,7 +267,10 @@ const Wallet: React.FC = () => {
             variant="outline" 
             disabled={!isKycApproved} 
             className="gap-2 flex-1 sm:flex-none text-sm"
-            onClick={() => setBuySellModalOpen(true)}
+            onClick={() => {
+              setBuySellDefaultTab("sell");
+              setBuySellModalOpen(true);
+            }}
           >
             <SellIcon className="h-4 w-4" />
             Sell
@@ -428,10 +435,12 @@ const Wallet: React.FC = () => {
           totalPortfolioValue={totalBalance}
           onBuy={() => {
             setShowBtcDetail(false);
+            setBuySellDefaultTab("buy");
             setBuySellModalOpen(true);
           }}
           onSell={() => {
             setShowBtcDetail(false);
+            setBuySellDefaultTab("sell");
             setBuySellModalOpen(true);
           }}
         />
@@ -443,6 +452,7 @@ const Wallet: React.FC = () => {
           currentBtcPrice={currentBtcPrice}
           btcBalance={btcBalance}
           usdcBalance={usdcBalance}
+          defaultTab={buySellDefaultTab}
         />
 
         {/* USDC Actions Modal */}
