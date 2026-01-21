@@ -232,55 +232,60 @@ const Wallet: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Action Buttons - Horizontal scroll on mobile */}
-        <div className="flex gap-2 md:gap-3 mb-4 md:mb-6 overflow-x-auto pb-2 -mx-3 px-3 md:mx-0 md:px-0 md:overflow-visible hide-scrollbar">
+        {/* Action Buttons - Flex wrap on mobile to show all buttons */}
+        <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
           <Button 
             disabled={!isKycApproved} 
-            className="gap-2 shrink-0 text-sm"
+            size="sm"
+            className="gap-1.5 text-xs sm:text-sm flex-1 min-w-0"
             onClick={() => navigate("/send")}
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Send
           </Button>
           <Button 
             variant="outline" 
             disabled={!isKycApproved} 
-            className="gap-2 shrink-0 text-sm"
+            size="sm"
+            className="gap-1.5 text-xs sm:text-sm flex-1 min-w-0"
             onClick={() => setReceiveModalOpen(true)}
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Receive
           </Button>
           <Button 
             variant="outline" 
             disabled={!isKycApproved} 
-            className="gap-2 shrink-0 text-sm"
+            size="sm"
+            className="gap-1.5 text-xs sm:text-sm flex-1 min-w-0"
             onClick={() => {
               setBuySellDefaultTab("buy");
               setBuySellModalOpen(true);
             }}
           >
-            <ShoppingCart className="h-4 w-4" />
+            <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Buy
           </Button>
           <Button 
             variant="outline" 
             disabled={!isKycApproved} 
-            className="gap-2 shrink-0 text-sm"
+            size="sm"
+            className="gap-1.5 text-xs sm:text-sm flex-1 min-w-0"
             onClick={() => {
               setBuySellDefaultTab("sell");
               setBuySellModalOpen(true);
             }}
           >
-            <SellIcon className="h-4 w-4" />
+            <SellIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Sell
           </Button>
           <Button 
             disabled={!isKycApproved} 
-            className="gap-2 shrink-0 text-sm bg-gradient-to-r from-primary to-pink-500 hover:from-primary/90 hover:to-pink-500/90"
+            size="sm"
+            className="gap-1.5 text-xs sm:text-sm flex-1 min-w-0 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
             onClick={() => navigate("/redeem")}
           >
-            <Gift className="h-4 w-4" />
+            <Gift className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Redeem
           </Button>
         </div>
