@@ -16,13 +16,13 @@ export function BottomNav() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-bottom">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t border-border safe-area-bottom safe-area-left safe-area-right">
       <div className="flex items-center justify-around h-16">
         {navItems.map((item) => (
           <NavLink
             key={item.title}
             to={item.url}
-            className={`flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors no-tap-highlight active:scale-95 ${
               isActive(item.url)
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
