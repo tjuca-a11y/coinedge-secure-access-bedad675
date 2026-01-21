@@ -80,8 +80,8 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 safe-area-all">
+      <Card className="w-full max-w-md mx-auto">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <LogIn className="h-8 w-8 text-primary" />

@@ -232,11 +232,11 @@ const Wallet: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6">
+        {/* Action Buttons - Horizontal scroll on mobile */}
+        <div className="flex gap-2 md:gap-3 mb-4 md:mb-6 overflow-x-auto pb-2 -mx-3 px-3 md:mx-0 md:px-0 md:overflow-visible hide-scrollbar">
           <Button 
             disabled={!isKycApproved} 
-            className="gap-2 flex-1 sm:flex-none text-sm"
+            className="gap-2 shrink-0 text-sm"
             onClick={() => navigate("/send")}
           >
             <Send className="h-4 w-4" />
@@ -245,7 +245,7 @@ const Wallet: React.FC = () => {
           <Button 
             variant="outline" 
             disabled={!isKycApproved} 
-            className="gap-2 flex-1 sm:flex-none text-sm"
+            className="gap-2 shrink-0 text-sm"
             onClick={() => setReceiveModalOpen(true)}
           >
             <Download className="h-4 w-4" />
@@ -254,7 +254,7 @@ const Wallet: React.FC = () => {
           <Button 
             variant="outline" 
             disabled={!isKycApproved} 
-            className="gap-2 flex-1 sm:flex-none text-sm"
+            className="gap-2 shrink-0 text-sm"
             onClick={() => {
               setBuySellDefaultTab("buy");
               setBuySellModalOpen(true);
@@ -266,7 +266,7 @@ const Wallet: React.FC = () => {
           <Button 
             variant="outline" 
             disabled={!isKycApproved} 
-            className="gap-2 flex-1 sm:flex-none text-sm"
+            className="gap-2 shrink-0 text-sm"
             onClick={() => {
               setBuySellDefaultTab("sell");
               setBuySellModalOpen(true);
@@ -277,7 +277,7 @@ const Wallet: React.FC = () => {
           </Button>
           <Button 
             disabled={!isKycApproved} 
-            className="gap-2 flex-1 sm:flex-none text-sm bg-gradient-to-r from-primary to-pink-500 hover:from-primary/90 hover:to-pink-500/90"
+            className="gap-2 shrink-0 text-sm bg-gradient-to-r from-primary to-pink-500 hover:from-primary/90 hover:to-pink-500/90"
             onClick={() => navigate("/redeem")}
           >
             <Gift className="h-4 w-4" />
