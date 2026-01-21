@@ -324,7 +324,7 @@ export const KycFlow: React.FC = () => {
     ];
 
     return (
-      <div className="flex items-center justify-center mb-8">
+      <div className="flex items-center justify-center mb-6 md:mb-8 overflow-x-auto pb-2">
         {steps.map((s, index) => {
           const Icon = s.icon;
           const isActive = s.id === step;
@@ -337,7 +337,7 @@ export const KycFlow: React.FC = () => {
             <React.Fragment key={s.id}>
               <div className="flex flex-col items-center">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 ${
                     isActive
                       ? 'bg-primary text-primary-foreground'
                       : isCompleted
@@ -351,10 +351,10 @@ export const KycFlow: React.FC = () => {
                     <Icon className="w-5 h-5" />
                   )}
                 </div>
-                <span className="text-xs mt-1 text-muted-foreground">{s.label}</span>
+                <span className="text-[10px] md:text-xs mt-1 text-muted-foreground whitespace-nowrap">{s.label}</span>
               </div>
               {index < steps.length - 1 && (
-                <div className={`w-16 h-0.5 mx-2 ${isCompleted ? 'bg-green-500' : 'bg-muted'}`} />
+                <div className={`w-8 md:w-16 h-0.5 mx-1 md:mx-2 shrink-0 ${isCompleted ? 'bg-green-500' : 'bg-muted'}`} />
               )}
             </React.Fragment>
           );
@@ -764,15 +764,15 @@ export const KycFlow: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-area-all">
+      <Card className="w-full max-w-2xl mx-auto">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Identity Verification</CardTitle>
+          <CardTitle className="text-xl md:text-2xl">Identity Verification</CardTitle>
           <CardDescription>
             Complete identity verification to unlock your CoinEdge wallet and enable all features.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-hidden">
           {step !== 'status' && renderStepIndicator()}
           {step === 'personal' && renderPersonalStep()}
           {step === 'identity' && renderIdentityStep()}
