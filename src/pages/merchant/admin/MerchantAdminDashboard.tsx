@@ -131,7 +131,7 @@ const MerchantAdminDashboard: React.FC = () => {
       )}
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Commissions</CardTitle>
@@ -141,7 +141,7 @@ const MerchantAdminDashboard: React.FC = () => {
             <div className="text-2xl font-bold text-green-600">
               ${activationStats?.totalCommission?.toFixed(2) ?? '0.00'}
             </div>
-            <p className="text-xs text-muted-foreground">Lifetime earnings</p>
+            <p className="text-xs text-muted-foreground">2% on redemption fee</p>
           </CardContent>
         </Card>
 
@@ -154,33 +154,7 @@ const MerchantAdminDashboard: React.FC = () => {
             <div className="text-2xl font-bold">
               ${wallet?.cash_credit_balance?.toFixed(2) ?? '0.00'}
             </div>
-            <p className="text-xs text-muted-foreground">For cash sales (5% commission)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Card Commissions</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${activationStats?.cardCommission?.toFixed(2) ?? '0.00'}
-            </div>
-            <p className="text-xs text-muted-foreground">2% on card sales</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cash Commissions</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${activationStats?.cashCommission?.toFixed(2) ?? '0.00'}
-            </div>
-            <p className="text-xs text-muted-foreground">5% on cash sales</p>
+            <p className="text-xs text-muted-foreground">Available for cash sales</p>
           </CardContent>
         </Card>
       </div>
